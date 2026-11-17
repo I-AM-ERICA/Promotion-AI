@@ -6,8 +6,8 @@ from .font_catalog import TypographyId
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
-TemplateId = Literal["editorial", "bold_sale", "soft_frame", "split", "night", "market", "type_stack", "magazine", "spotlight", "diagonal"]
-PaletteId = Literal["cream", "coral", "sage", "cobalt", "ink", "peach", "burgundy", "forest"]
+TemplateId = Literal["editorial", "bold_sale", "soft_frame", "split", "night", "market", "type_stack", "magazine", "spotlight", "diagonal", "floating_type", "big_focus"]
+PaletteId = Literal["cream", "coral", "sage", "cobalt", "ink", "peach", "burgundy", "forest", "sky", "tangerine", "scarlet"]
 
 
 class Model(BaseModel):

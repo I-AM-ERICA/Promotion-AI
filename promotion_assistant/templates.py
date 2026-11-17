@@ -1,5 +1,6 @@
 """Reviewed layout and colour choices; models cannot supply CSS or coordinates."""
 from dataclasses import dataclass
+import re
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,8 @@ TEMPLATES = [
     Template("magazine", "매거진", "왼쪽 세리프 제목과 오른쪽 큰 상품, 뷰티·패션·공방", "cream", "brand", "gowun_batang"),
     Template("spotlight", "스튜디오 글로우", "은은한 조명과 받침대 위의 상품, 병·화장품·생활용품", "forest", "hero", "serif"),
     Template("diagonal", "다이내믹", "두 가지 색면과 대각선 상품, 신발·잡화·전자제품", "cobalt", "offer", "dohyeon"),
+    Template("floating_type", "플로팅 타입", "큰 글자와 윤곽선 글자 사이에 떠 있는 상품", "sky", "offer", "black_han_sans"),
+    Template("big_focus", "빅 포커스", "대담한 큰 글자와 화면을 채우는 상품", "tangerine", "brand", "black_han_sans"),
 ]
 
 
@@ -31,6 +34,20 @@ def default_font(template_id):
     if template.font_id != "auto":
         return template.font_id
     return "serif" if template_id in ("editorial", "night", "soft_frame") else "bold"
+
+
+REFERENCE_LAYOUTS = {
+    "typography": ("type_stack", "floating_type", "big_focus"),
+    "editorial": ("editorial", "split", "magazine"),
+    "studio": ("spotlight", "split", "night"),
+    "dynamic": ("type_stack", "diagonal", "big_focus"),
+    "minimal": ("editorial", "bold_sale", "soft_frame"),
+}
+
+
+def reference_family(style):
+    match = re.match(r"\s*\[(typography|editorial|studio|dynamic|minimal)\]", style, re.I)
+    return match[1].lower() if match else None
 
 
 def diverse_designs(designs, visual_context=None):
@@ -50,6 +67,10 @@ def diverse_designs(designs, visual_context=None):
             template = by_id[value]
             value = designs[next(remaining)].model_copy(update={"template_id": template.id, "palette": template.palette, "typography": "auto"})
         result.append(value)
+    reference = REFERENCE_LAYOUTS.get((visual_context or {}).get("style_family"))
+    if reference:
+        # Preserve model-chosen copy/colour/fonts, but use the reference's composition family.
+        result = [d.model_copy(update={"template_id": template}) for d,template in zip(result,reference)]
     if visual_context and visual_context.get("shape") == "wide":
         # Narrow side columns make wide products too small. Keep the chosen colour and copy.
         replacements = {"split": "diagonal", "night": "soft_frame", "magazine": "soft_frame"}
@@ -65,4 +86,7 @@ PALETTES = {
     "peach": ("#F9E8DD", "#60362B", "#B94B3D", "#FFF8EF", "#835E52"),
     "burgundy": ("#F8F0DD", "#7F2026", "#932A30", "#EDDDBE", "#79534C"),
     "forest": ("#153C35", "#F4EFDC", "#DFC48A", "#41695A", "#CFD9C5"),
+    "sky": ("#3468AE", "#FFFDF3", "#FFF0BB", "#517DB7", "#EDF3FF"),
+    "tangerine": ("#AD450F", "#FFF3DC", "#FFF3DC", "#C46328", "#FFF0D8"),
+    "scarlet": ("#FAF7F0", "#C72027", "#C72027", "#F2E4D9", "#8D3837"),
 }

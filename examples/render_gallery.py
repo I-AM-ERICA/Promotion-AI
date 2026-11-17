@@ -1,5 +1,6 @@
-"""Render six templates with an ORIGINAL illustrative product, not a product photo."""
+"""Render all templates with an ORIGINAL illustration, not a product photo."""
 from pathlib import Path
+import math
 from PIL import Image, ImageDraw
 from promotion_assistant.renderer import Renderer
 from promotion_assistant.models import Brief, Design
@@ -32,9 +33,9 @@ def main():
     brief = Brief(store={"store_id": "sample", "name": "오후의 베이커리", "region": "성수동"},
                   product="버터 소금빵", message="바삭한 첫입, 촉촉한 속.\n오늘의 작은 여유를 담았어요.",
                   price=3500, original_price=4000, period="11.20 – 11.27", contact="매장 방문 · 포장 가능")
-    sheet = Image.new("RGB", (1128, 1050), "#F5F4EF")
+    sheet = Image.new("RGB", (1128, 65+math.ceil(len(TEMPLATES)/3)*492), "#F5F4EF")
     label = ImageDraw.Draw(sheet)
-    label.text((24, 15), "Promotion-AI · 6 templates / 샘플 일러스트", font=renderer.font(24, True), fill="#293C31")
+    label.text((24, 15), f"Promotion-AI · {len(TEMPLATES)} templates / 샘플 일러스트", font=renderer.font(24, True), fill="#293C31")
     for index, template in enumerate(TEMPLATES):
         design = Design(template_id=template.id, palette=template.palette, headline="버터의 풍미,\n소금의 여운",
                         subhead="고소한 향으로 채우는 오늘", emphasis="price")

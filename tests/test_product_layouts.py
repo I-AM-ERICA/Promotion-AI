@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 from promotion_assistant.font_catalog import FONT_CHOICES, ROOT, TypographyId
 from promotion_assistant.models import Brief, Design
 from promotion_assistant.renderer import Renderer
-from promotion_assistant.templates import TEMPLATES, diverse_designs
+from promotion_assistant.templates import TEMPLATES, diverse_designs, reference_family, REFERENCE_LAYOUTS
 from promotion_assistant.visual_profile import visual_profile, is_product_set
 from promotion_assistant.design_edits import explicit_edits
 from examples.product_fixtures import fixture_bytes
@@ -72,6 +72,19 @@ def test_shape_uses_subject_bounds_and_wide_products_avoid_narrow_columns():
     result=diverse_designs(designs,context)
     assert [d.template_id for d in result]==["editorial","diagonal","soft_frame"]
     assert is_product_set("선물세트") and not is_product_set("텀블러")
+
+
+@pytest.mark.parametrize("family",REFERENCE_LAYOUTS)
+def test_reference_layout_family_changes_composition_without_copying_colors(family):
+    style=f"[{family}] 큰 글자, 명도 대비와 여백"
+    assert reference_family(style)==family
+    original=[Design(template_id=t,palette=p,headline="상품의 매력")
+              for t,p in zip(("editorial","bold_sale","night"),("cream","scarlet","tangerine"))]
+    result=diverse_designs(original,{"style_family":family})
+    assert tuple(d.template_id for d in result)==REFERENCE_LAYOUTS[family]
+    assert [d.palette for d in result]==[d.palette for d in original]
+    assert [d.headline for d in result]==[d.headline for d in original]
+    assert reference_family("초록색 배경") is None
 
 
 @pytest.mark.parametrize("size,angle",[((180,900),0),((1200,300),0),((1200,300),-12)])

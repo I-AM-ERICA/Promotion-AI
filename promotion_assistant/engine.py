@@ -8,7 +8,7 @@ from .models import Brief, Design, validate_copy
 from .renderer import normalize_image, vision_image
 from .storage import Conflict
 from .product_image import ProductProcessor
-from .templates import diverse_designs
+from .templates import diverse_designs, reference_family
 from .visual_profile import visual_profile, is_product_set
 
 
@@ -67,6 +67,7 @@ class Engine:
             self.check(deadline, cancelled)
             style = self.designer.analyze_style(vision_image(reference), deadline) if reference else ""
             profile = visual_profile(processed.data, brief)
+            profile["style_family"] = reference_family(style)
             designs = diverse_designs(self.designer.designs(brief, deadline, style=style, visual_context=profile), profile)
             prepared = []
             for design in designs:

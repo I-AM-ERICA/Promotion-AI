@@ -5,7 +5,7 @@ from io import BytesIO
 from pathlib import Path
 import os
 import warnings
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter, ImageChops
 from .product_image import has_transparency
 from .templates import PALETTES, TEMPLATES, default_font
 import math
@@ -112,7 +112,16 @@ class Renderer:
                 return len(lines) * step
         raise LayoutError("문구가 포스터 영역에 맞지 않습니다. 글귀를 조금 줄여 주세요.")
 
-    def photo(self, canvas, data, box, panel, ink, product, fit="contain", radius=10, angle=0):
+    def decorative_type(self, canvas, value, box, color, family, *, outline=False):
+        x,y,w,h=map(int,box)
+        mask=Image.new("L",(w,h))
+        self.text(ImageDraw.Draw(mask),value,(4,4,w-8,h-8),255,240,30,True,"center",
+                  family=family,balanced=True,leading=1.02)
+        if outline:
+            mask=ImageChops.subtract(mask.filter(ImageFilter.MaxFilter(7)),mask)
+        canvas.paste(color,(x,y,x+w,y+h),mask)
+
+    def photo(self, canvas, data, box, panel, ink, product, fit="contain", radius=10, angle=0, rotate_tall=False):
         x, y, w, h = map(int, box)
         if min(w, h) < 100:
             raise LayoutError("상품 사진을 배치할 공간이 부족합니다. 글귀를 줄여 주세요.")
@@ -123,7 +132,7 @@ class Renderer:
                 bounds = source.getchannel("A").point(lambda v: 255 if v > 16 else 0).getbbox()
                 if bounds:
                     source = source.crop(bounds)
-                if angle and source.width/source.height > 1.3:
+                if angle and (rotate_tall or source.width/source.height > 1.3):
                     source = source.rotate(angle, Image.Resampling.BICUBIC, expand=True)
                 # Transparent assets float on the layout, with breathing room for a soft shadow.
                 scale = min(w*.88/source.width, h*.86/source.height)
@@ -211,7 +220,8 @@ class Renderer:
             raise LayoutError("문구와 상품 사진을 함께 배치하기 어렵습니다. 메시지를 줄여 주세요.")
         required = {"split": 860 if brief.price is not None else 680,
                     "soft_frame": 705, "market": 720, "type_stack": 730,
-                    "spotlight": 710, "magazine": 760, "diagonal": 740}.get(variant, 600)
+                    "spotlight": 710, "magazine": 760, "diagonal": 740,
+                    "floating_type": 730, "big_focus": 730}.get(variant, 600)
         if top_end < required:
             raise LayoutError("이 구도에 문구가 모두 들어가지 않습니다. 메시지를 줄여 주세요.")
         family = self.headline_family(design)
@@ -287,6 +297,22 @@ class Renderer:
                           family=family, balanced=True, leading=1.05)
             photo((72, 246, 936, top_end-246))
             # Product details below remain fully readable; background words are decorative.
+        elif variant == "floating_type":
+            title((72, 140, 936, 110), 58, "center")
+            band_h=(top_end-270)//2
+            for y in (270,270+band_h):
+                self.decorative_type(canvas,brief.product,(28,y,1024,band_h),fg,family)
+            self.photo(canvas,product_image,(140,240,800,top_end-240),panel,fg,
+                       brief.product,design.image_fit,12,angle=-13,rotate_tall=True)
+            # A thin outline echoes the lower word without an opaque block over the product.
+            if product_image and has_transparency(Image.open(BytesIO(product_image)).convert("RGBA")):
+                self.decorative_type(canvas,brief.product,(28,270+band_h,1024,band_h),fg,family,outline=True)
+        elif variant == "big_focus":
+            title((72,140,936,105),64)
+            self.decorative_type(canvas,brief.product,(30,255,1020,min(340,top_end-390)),fg,family)
+            # The source stays whole by default; a deliberate cover edit can crop opaque photos.
+            photo((155,370,870,top_end-370),8)
+            d.line((72,top_end-28,132,top_end-28),fill=fg,width=3)
         elif variant == "magazine":
             d.line((72, 126, 1008, 126), fill=muted, width=1)
             title((72, 165, 402, 300), 100)

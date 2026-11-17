@@ -104,6 +104,7 @@ gRPC 외에 같은 엔진의 HTTP API도 제공합니다. Spring 서버에서 �
 
 - `GET /health`: 프로세스/설정 준비 상태. 실제 CLOVA 도달성 검사는 하지 않습니다.
 - `GET /v1/templates`: 템플릿 목록.
+- `GET /v1/fonts`: 글꼴 목록 `{fonts:[{id,name,description}]}`. 동일한 내부 인증이 필요합니다.
 - `POST /v1/posters/drafts`: 아래 Brief → `{drafts, mode}`.
 - `GET /v1/posters/{id}?store_id=...`: 최신 시안.
 - `POST /v1/posters/{id}/revisions`: 아래 Revision → 새 시안.
@@ -137,6 +138,10 @@ gRPC 외에 같은 엔진의 HTTP API도 제공합니다. Spring 서버에서 �
 POSTER_PUBLIC_BASE_URL은 브라우저에서도 접근 가능한 주소여야 합니다. 외부 사용자의 브라우저에 localhost URL을 반환하면 이미지가 열리지 않습니다. 운영에서는 HTTPS reverse proxy의 주소를 설정하고 내부 API 및 gRPC는 사설망에 둡니다. 별도 Object Storage 업로드는 아직 구현하지 않았습니다.
 
 ## 저장 · 동시성 · 실패 처리
+
+디자인 JSON의 `template_id`는 `editorial`, `bold_sale`, `soft_frame`, `split`, `night`, `market`, `type_stack`, `magazine`, `spotlight`, `diagonal`, `floating_type`, `big_focus`를 지원합니다. `typography`는 `auto`, `sans`, `bold`, `serif`, `gowun_batang`, `gowun_dodum`, `jua`, `dohyeon`, `black_han_sans`, `nanum_pen`입니다. 기존 ID와 proto 필드는 유지됩니다. 글꼴 수정은 `제목 서체를 jua로 바꿔줘`처럼 안정적인 ID를 사용하면 API 호출 없이 적용됩니다.
+
+기본 생성 화면에는 상품 사진·상품명·가게명·소식·선택 가격만 노출하고, 기간/연락처와 상세 디자인은 접는 구성을 권장합니다. 생성된 3개 중 선택하여 바로 저장할 수 있어야 합니다. 상품명으로 세트/묶음을 확인하면 `background_mode=auto`에서는 원본을 보존합니다. `remove`를 명시하면 분리하며, 처리 결과는 기존 `image_processing` 필드로 안내합니다. 상품 윤곽 비율 분석과 긴 입력용 구도 전환은 서버 내부 처리이므로 요청 필드를 추가할 필요가 없습니다.
 
 - 서버가 보관한 원본 정보로 렌더링하며 LLM은 가격/기간/상품/매장/사진을 바꿀 수 없습니다.
 - 모델 문구의 숫자와 단위를 입력 사실과 비교하고, 할인율은 정가·판매가로 계산하여 내림 표시합니다.

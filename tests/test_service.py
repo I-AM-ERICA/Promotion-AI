@@ -107,6 +107,21 @@ def test_live_fact_change_returns_actionable_error(brief):
         designer.designs(brief,time.monotonic()+5,current=current,instruction="가격을 5000원으로")
 
 
+def test_reference_typography_shortlists_three_distinct_layouts(brief):
+    expected={"type_stack","floating_type","big_focus"}
+    def handler(request):
+        data=json.loads(request.content)
+        payload=json.loads(data["messages"][1]["content"])
+        assert {t["id"] for t in payload["templates"]}==expected
+        allowed=data["responseFormat"]["schema"]["properties"]["designs"]["items"]["properties"]["template_id"]["enum"]
+        assert set(allowed)==expected
+        designs=[Design(template_id=t,palette=p,headline="상품의 매력") for t,p in
+                 zip(sorted(expected),("cream","scarlet","tangerine"))]
+        return success({"designs":[d.model_dump() for d in designs]})
+    results=clova_client(handler).designs(brief,time.monotonic()+10,style="[typography] 큰 글자와 상품의 겹침, 강한 대비")
+    assert {d.template_id for d in results}==expected
+
+
 def test_engine_three_drafts_revision_restart_ownership(engine,brief):
     result=engine.create(brief)
     assert len(result["drafts"])==3
