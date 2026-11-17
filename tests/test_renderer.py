@@ -69,3 +69,5 @@ def test_model_cannot_introduce_numeric_claims(brief):
         validate_copy(invalid, brief)
     valid = invalid.model_copy(update={"headline": "버터 소금빵 3,500원"})
     assert validate_copy(valid, brief).headline == valid.headline
+    with pytest.raises(ValueError):
+        validate_copy(invalid.model_copy(update={"headline": "4000% 할인"}), brief)
