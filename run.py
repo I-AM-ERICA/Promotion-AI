@@ -10,8 +10,8 @@ def main():
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
-    if sys.version_info < (3, 11):
-        raise SystemExit("Python 3.11 이상이 필요합니다. 검증 버전은 Python 3.12입니다.")
+    if not (3, 11) <= sys.version_info < (3, 14):
+        raise SystemExit("Python 3.11–3.13이 필요합니다. 검증 버전은 Python 3.12입니다.")
     root = Path(__file__).resolve().parent
     runtime = Path(os.environ.get("LOCALAPPDATA", str(Path.home()/".local/share"))) / "Promotion-AI"
     env_dir = runtime / f"venv-py{sys.version_info.major}.{sys.version_info.minor}"
@@ -23,7 +23,7 @@ def main():
     stamp = env_dir / "promotion-requirements.sha256"
     digest = hashlib.sha256(requirement.read_bytes()).hexdigest()
     if not stamp.is_file() or stamp.read_text().strip() != digest:
-        print("실행 패키지를 설치합니다. GPU·학습 모델은 설치하지 않습니다.", flush=True)
+        print("CPU 실행 패키지를 설치합니다. 배경 제거에는 사전 학습된 U2Net을 사용합니다.", flush=True)
         subprocess.run([str(python), "-m", "pip", "install", "-r", str(requirement)], check=True)
         stamp.write_text(digest)
     arguments = sys.argv[1:]

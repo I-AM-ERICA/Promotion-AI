@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--port", type=int, default=8081)
     parser.add_argument("--grpc-address", default="127.0.0.1:50052")
     parser.add_argument("--env-file", default=".env")
+    parser.add_argument("--no-cutout", action="store_true", help="배경 제거 모델을 불러오지 않음")
     args = parser.parse_args()
     load_dotenv(args.env_file, override=False)
     if args.studio and args.host not in ("127.0.0.1", "::1", "localhost"):
@@ -36,8 +37,17 @@ def main():
         parser.error(str(error))
     designer = DemoDesigner() if settings.demo else ClovaDesigner(settings.api_key)
     engine = Engine(settings, designer, renderer, Repository(settings.data_dir))
-    server, _ = build_server(engine, args.grpc_address)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    if args.no_cutout:
+        engine.processor.unavailable = True
+    else:
+        logging.info("상품 배경 제거 모델을 준비합니다. 최초 실행에는 U2Net 다운로드가 필요합니다.")
+        try:
+            engine.processor.warmup()
+        except Exception as error:
+            engine.processor.unavailable = True
+            logging.warning("배경 제거 준비 실패 (%s). 원본 사진으로 계속 실행합니다.", type(error).__name__)
+    server, _ = build_server(engine, args.grpc_address)
     server.start()
     logging.info("Promotion gRPC: %s; mode=%s; data=%s", args.grpc_address,
                  "DEMO (no AI calls)" if args.demo else "CLOVA", settings.data_dir)

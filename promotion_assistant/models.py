@@ -45,6 +45,7 @@ class Brief(Model):
     original_price: int | None = Field(default=None, ge=1, le=999_999_999)
     period: str = Field(default="", max_length=60)
     contact: str = Field(default="", max_length=100)
+    background_mode: Literal["auto", "remove", "keep"] = "auto"
     product_image: ImageInput | None = None
     logo: ImageInput | None = None
     style_reference: ImageInput | None = None

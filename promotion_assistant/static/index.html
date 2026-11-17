@@ -13,6 +13,7 @@
 <label class="upload" for="product-image"><img id="product-preview" alt="선택한 상품 사진" hidden><span id="upload-label"><b>＋</b><strong>상품 사진 올리기</strong><small>JPG · PNG · WEBP / 최대 5MB</small></span></label>
 <input id="product-image" type="file" accept="image/png,image/jpeg,image/webp" class="file-input">
 <div class="upload-actions"><span>사진 없이 문구 중심으로도 만들 수 있어요.</span><button type="button" id="remove-image" class="text-button" hidden>제거</button></div>
+<label for="background-mode">상품 사진 배경</label><select id="background-mode"><option value="auto">자동으로 배경 정리</option><option value="remove">배경 제거하기</option><option value="keep">원본 배경 유지</option></select>
 <label for="store">가게 이름 <span>*</span></label><input id="store" required maxlength="40" placeholder="예: 오후의 베이커리">
 <label for="product">홍보할 상품 <span>*</span></label><input id="product" required maxlength="100" placeholder="예: 버터 소금빵">
 <label for="message">꼭 전하고 싶은 소식</label><textarea id="message" rows="3" maxlength="500" placeholder="상품 소개, 행사 내용, 꼭 들어가야 할 문구를 적어 주세요."></textarea>
@@ -30,6 +31,7 @@
 <div id="status" class="status" role="status" aria-live="polite"></div><div id="error" class="error" role="alert" hidden></div>
 <div id="empty" class="empty-state"><div class="paper-stack"><div class="paper p1"><span>작은 가게의<br>큰 매력</span><i></i></div><div class="paper p2"><small>OUR SIGNATURE</small><span>좋은 하루,<br>좋은 한입.</span><i></i></div><div class="paper p3"><span>오늘을<br>더 특별하게</span><i></i></div></div><h3>가게만의 분위기를 찾아보세요</h3><p>상품 정보로 서로 다른 세 가지 시안을 만들어요.<br>마음에 드는 한 장을 골라 더 다듬어 보세요.</p><div class="tags"><span>6가지 템플릿</span><span>자연어 수정</span><span>PNG 저장</span></div></div>
 <div id="drafts" class="draft-grid" hidden></div>
+<p id="image-status" class="note" role="status" hidden></p>
 <section id="editor" class="editor panel" hidden>
 <div class="section-head"><div><span id="selected-label" class="eyebrow"></span><h2>조금 더 우리 가게답게</h2></div><a id="download" class="primary" download="poster.png">↓ PNG 저장</a></div>
 <label for="instruction">어떻게 바꾸고 싶으세요?</label><div class="edit-row"><input id="instruction" maxlength="500" placeholder="예: 배경은 초록색으로, 가격을 더 강조해줘"><button id="revise" class="primary" type="button">수정하기</button></div>

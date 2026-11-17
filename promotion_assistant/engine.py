@@ -7,13 +7,15 @@ from .clova import ProviderError
 from .models import Brief, Design, validate_copy
 from .renderer import normalize_image, vision_image
 from .storage import Conflict
+from .product_image import ProductProcessor
 
 
 class Engine:
-    def __init__(self, settings, designer, renderer, repository):
+    def __init__(self, settings, designer, renderer, repository, processor=None):
         self.settings, self.designer = settings, designer
         self.renderer, self.repository = renderer, repository
         self.slots = threading.BoundedSemaphore(2)
+        self.processor = processor or ProductProcessor()
 
     @contextmanager
     def slot(self):
@@ -55,6 +57,7 @@ class Engine:
         with self.slot():
             photo, logo = normalize_image(brief.product_image), normalize_image(brief.logo)
             reference = normalize_image(brief.style_reference)
+            processed = self.processor.process(photo, brief.background_mode)
             self.check(deadline, cancelled)
             style = self.designer.analyze_style(vision_image(reference), deadline) if reference else ""
             designs = self.designer.designs(brief, deadline, style=style)
@@ -62,10 +65,13 @@ class Engine:
             for design in designs:
                 self.check(deadline, cancelled)
                 design = validate_copy(design, brief)
-                png = self.renderer.render(brief, design, photo, logo)
-                prepared.append((self.record(brief, design), png))
+                png = self.renderer.render(brief, design, processed.data, logo)
+                record = self.record(brief, design)
+                record["image_processing"] = {"background": processed.status, "warning": processed.warning}
+                prepared.append((record, png))
             self.check(deadline, cancelled)
-            records = self.repository.create(brief, photo, logo, style, prepared)
+            records = self.repository.create(brief, photo, logo, style, prepared,
+                                             cutout=processed.data if processed.status == "removed" else None)
             return {"drafts": [self.expose(r) for r in records], "mode": "demo" if self.settings.demo else "clova"}
 
     def create_legacy(self, brief, generate_image, **kwargs):
@@ -98,4 +104,5 @@ class Engine:
             self.check(deadline, cancelled)
             record = self.record(brief, design, draft_id=draft_id, version=old["version"]+1)
             record["project_id"] = old["project_id"]
+            record["image_processing"] = old.get("image_processing", {"background": "kept", "warning": ""})
             return self.expose(self.repository.revise(record, png, revision.expected_version))

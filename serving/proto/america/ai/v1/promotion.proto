@@ -26,6 +26,7 @@ message PosterRequest {
   optional int64 original_price = 11;
   string period = 12;
   string contact = 13;
+  string background_mode = 14; // auto (default), remove, keep
 }
 message PosterImage {
   bytes data = 1;
@@ -45,6 +46,7 @@ message PosterDraft {
   string mode = 5;
   int32 width = 6;
   int32 height = 7;
+  string image_processing_json = 8;
 }
 message PosterDrafts {
   repeated PosterDraft drafts = 1;

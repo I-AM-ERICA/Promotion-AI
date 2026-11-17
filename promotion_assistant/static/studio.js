@@ -79,7 +79,7 @@ const number=(id)=>$(id).value===''?null:Number($(id).value);
 $('brief-form').addEventListener('submit',async(event)=>{
   event.preventDefault();if(busy||uploads)return;
   const brief={store:{store_id:storeId,name:$('store').value.trim()},product:$('product').value.trim(),message:$('message').value.trim(),
-    tone:$('tone').value,price:number('price'),original_price:number('original-price'),period:$('period').value.trim(),contact:$('contact').value.trim(),...images};
+    tone:$('tone').value,price:number('price'),original_price:number('original-price'),period:$('period').value.trim(),contact:$('contact').value.trim(),background_mode:$('background-mode').value,...images};
   lock(true);message(config.mode==='demo'?'체험용 시안 3개를 만들고 있어요.':'우리 가게에 어울리는 시안을 만들고 있어요.');
   try {
     const result=await api('/v1/posters/drafts',brief);
@@ -105,6 +105,9 @@ function render(){
     $('drafts').append(card);
   });
   const draft=drafts[selected];
+  const processing=draft.image_processing || {};
+  $('image-status').textContent=processing.warning || ({removed:'상품 배경을 제거하고 부드러운 그림자를 더했어요.',transparent:'투명한 상품 이미지에 부드러운 그림자를 더했어요.',kept:'원본 사진의 배경을 유지했어요.'}[processing.background] || '');
+  $('image-status').hidden=!$('image-status').textContent;
   $('selected-label').textContent='선택한 시안 '+(selected+1)+' · 버전 '+draft.version;
   $('download').href=draft.image_url+'?download=true';
   $('caption').textContent=[draft.caption.headline,draft.caption.body,draft.caption.hashtags.join(' ')].filter(Boolean).join('\n\n');

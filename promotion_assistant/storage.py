@@ -30,6 +30,9 @@ class Repository:
                 record TEXT NOT NULL, image_name TEXT UNIQUE NOT NULL,
                 PRIMARY KEY(id,version), FOREIGN KEY(project_id) REFERENCES projects(id));
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(projects)")}
+            if "cutout" not in columns:
+                db.execute("ALTER TABLE projects ADD COLUMN cutout BLOB")
 
     @contextmanager
     def connect(self):
@@ -49,14 +52,14 @@ class Repository:
             stream.write(png)
         return name
 
-    def create(self, brief, photo, logo, style, records_and_pngs):
+    def create(self, brief, photo, logo, style, records_and_pngs, *, cutout=None):
         project = uuid.uuid4().hex
         created = []
         try:
             with self.connect() as db:
-                db.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)",
+                db.execute("INSERT INTO projects(id,store_id,brief,photo,logo,style,cutout) VALUES(?,?,?,?,?,?,?)",
                            (project, brief.store.store_id, json.dumps(brief.facts(), ensure_ascii=False),
-                            photo, logo, style))
+                            photo, logo, style, cutout))
                 for record, png in records_and_pngs:
                     name = self._save_image(png)
                     created.append(name)
@@ -71,7 +74,7 @@ class Repository:
 
     def get(self, draft_id, store_id):
         with self.connect() as db:
-            row = db.execute("""SELECT d.record,p.brief,p.photo,p.logo,p.style FROM drafts d
+            row = db.execute("""SELECT d.record,p.brief,COALESCE(p.cutout,p.photo) AS photo,p.logo,p.style FROM drafts d
                 JOIN projects p ON d.project_id=p.id WHERE d.id=? AND p.store_id=?
                 ORDER BY d.version DESC LIMIT 1""", (draft_id, store_id)).fetchone()
         if not row:

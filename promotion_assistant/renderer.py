@@ -5,7 +5,8 @@ from io import BytesIO
 from pathlib import Path
 import os
 import warnings
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
+from .product_image import has_transparency
 from .templates import PALETTES
 
 WIDTH, HEIGHT = 1080, 1350
@@ -111,11 +112,29 @@ class Renderer:
         frame = Image.new("RGB", (w, h), panel)
         if data:
             source = Image.open(BytesIO(data)).convert("RGBA")
+            if has_transparency(source):
+                bounds = source.getchannel("A").point(lambda v: 255 if v > 16 else 0).getbbox()
+                if bounds:
+                    source = source.crop(bounds)
+                # Transparent assets float on the layout, with breathing room for a soft shadow.
+                scale = min(w*.88/source.width, h*.86/source.height)
+                source = source.resize((max(1, round(source.width*scale)), max(1, round(source.height*scale))), Image.Resampling.LANCZOS)
+                layer = Image.new("RGBA", (w, h))
+                px, py = (w-source.width)//2, (h-source.height)//2
+                shadow_mask = Image.new("L", (w, h))
+                shadow_mask.paste(source.getchannel("A"), (px+7, py+17))
+                shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(18)).point(lambda v: round(v*.23))
+                shadow = Image.new("RGBA", (w, h), (24, 20, 17, 0))
+                shadow.putalpha(shadow_mask)
+                layer.alpha_composite(shadow)
+                layer.alpha_composite(source, (px, py))
+                canvas.paste(layer, (x, y), layer)
+                return
             if fit == "cover":
                 source = ImageOps.fit(source, (w, h), method=Image.Resampling.LANCZOS)
                 frame.paste(source, (0, 0), source)
             else:
-                source.thumbnail((int(w*.94), int(h*.94)), Image.Resampling.LANCZOS)
+                source = ImageOps.contain(source, (int(w*.94), int(h*.94)), Image.Resampling.LANCZOS)
                 frame.paste(source, ((w-source.width)//2, (h-source.height)//2), source)
         else:
             d = ImageDraw.Draw(frame)

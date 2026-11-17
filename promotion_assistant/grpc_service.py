@@ -18,6 +18,7 @@ def brief_from_proto(request):
         "product": request.product, "message": request.message,
         "tone": request.tone or "따뜻하고 친근하게", "channel": request.channel or "instagram",
         "period": request.period, "contact": request.contact,
+        "background_mode": request.background_mode or "auto",
     }
     for key in ("price", "original_price"):
         if request.HasField(key):
@@ -35,6 +36,7 @@ def draft_message(record):
         result=pb.PosterResult(**record["caption"], image_url=record["image_url"]),
         design_json=json.dumps(record["design"], ensure_ascii=False),
         width=record["width"], height=record["height"],
+        image_processing_json=json.dumps(record.get("image_processing", {}), ensure_ascii=False),
     )
 
 
