@@ -17,7 +17,7 @@ from promotion_assistant.config import Settings
 from promotion_assistant.engine import Engine
 from promotion_assistant.grpc_service import build_server
 from promotion_assistant.models import Brief, Design, Revision
-from promotion_assistant.renderer import Renderer
+from promotion_assistant.renderer import Renderer, vision_image
 from promotion_assistant.storage import Repository, Conflict, NotFound
 
 
@@ -58,7 +58,7 @@ def test_clova_request_is_real_naver_schema_and_bearer(brief):
     assert len(clova_client(handler).designs(brief,time.monotonic()+10))==3
 
 
-@pytest.mark.parametrize("status,code",[(429,"RATE_LIMIT"),(401,"AUTH"),(403,"AUTH"),(500,"UPSTREAM")])
+@pytest.mark.parametrize("status,code",[(400,"REQUEST"),(429,"RATE_LIMIT"),(401,"AUTH"),(403,"AUTH"),(500,"UPSTREAM")])
 def test_clova_errors_are_sanitized(brief,status,code):
     designer=clova_client(lambda _:httpx.Response(status,text="secret-never-leak internal error"))
     with pytest.raises(ProviderError) as raised:
@@ -78,17 +78,23 @@ def test_clova_rejects_truncated_and_malformed_outputs(brief):
 def test_live_revision_and_style_use_separate_naver_models(brief):
     seen=[]
     current=mock_designs(brief)[0]
+    image=BytesIO()
+    Image.new("RGB",(80,120),"green").save(image,"PNG")
     def handler(request):
         seen.append(request.url.path)
         data=json.loads(request.content)
         if request.url.path.endswith("HCX-005"):
             uri=data["messages"][1]["content"][1]["dataUri"]["data"]
-            assert base64.b64decode(uri, validate=True)==b"image"
+            prefix,encoded=uri.split(",",1)
+            assert prefix=="data:image/png;base64"
+            decoded=base64.b64decode(encoded, validate=True)
+            assert Image.open(BytesIO(decoded)).format=="PNG"
+            assert decoded==image.getvalue()
             return httpx.Response(200,json={"status":{"code":"20000"},"result":{"finishReason":"stop","message":{"content":"초록색과 넓은 여백"}}})
         assert "current" in json.loads(data["messages"][1]["content"])
         return success({"design":current.model_dump()|{"palette":"sage"},"needs_fact_edit":False})
     designer=clova_client(handler)
-    style=designer.analyze_style(b"image",time.monotonic()+5)
+    style=designer.analyze_style(image.getvalue(),time.monotonic()+5)
     result=designer.designs(brief,time.monotonic()+5,style=style,current=current,instruction="초록을 주조색으로 차분하고 고급스럽게")
     assert result[0].palette=="sage"
     assert [s.rsplit("/",1)[-1] for s in seen]==["HCX-005","HCX-007"]

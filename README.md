@@ -68,7 +68,7 @@ python run.py --studio
 
 공식 규격: [HCX-007 Structured Outputs](https://api.ncloud-docs.com/docs/clovastudio-chatcompletionsv3-so), [HCX-005 텍스트·이미지](https://api.ncloud-docs.com/docs/clovastudio-chatcompletionsv3).
 
-**검증 범위 (2026-11-17):** 실제 HCX-007 키로 판매가 3,500원·정가 4,000원 시안 3개 생성과 자연어 제목·설명 수정을 확인했습니다. U2Net CPU 배경 제거, 브라우저 사진 업로드·시안 선택·색상/서체 수정·1080×1350 PNG 저장을 확인했습니다. HTTP/gRPC 등 자동 테스트 72개를 통과했습니다. HCX-005 스타일 분석과 오류 응답은 모의 HTTP 테스트 범위입니다. Docker 실행은 아직 검증하지 않았습니다.
+**검증 범위 (2026-11-17):** 실제 HCX-007 키로 판매가 3,500원·정가 4,000원 시안 3개 생성과 자연어 제목·설명 수정을 확인했습니다. U2Net CPU 배경 제거, 브라우저 사진 업로드·시안 선택·색상/서체 수정·1080×1350 PNG 저장을 확인했습니다. 실제 JPG 참고 이미지로 HCX-005 분석 → HCX-007 시안 3개 → PNG 다운로드도 검증했습니다. PNG/JPG/WEBP 참고 이미지의 요청 형식과 긴 비율 보정은 자동 테스트로 검사합니다. Docker 실행은 아직 검증하지 않았습니다.
 
 ## 서비스 구조와 팀 연동
 
