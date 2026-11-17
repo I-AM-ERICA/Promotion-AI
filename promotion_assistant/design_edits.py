@@ -1,23 +1,34 @@
 """Apply unambiguous design controls without leaving enum selection to the LLM."""
 import re
 from .templates import TEMPLATES
+from .font_catalog import FONT_CHOICES
 
-PALETTE_LABELS = {"cream": "크림색", "coral": "빨간색", "sage": "초록색",
-                  "cobalt": "파란색", "ink": "어두운 색", "peach": "분홍색"}
+PALETTE_LABELS = {
+    "cream": "크림·브라운: 따뜻한 저채도, 담백한 여백",
+    "coral": "코랄 레드·크림·레몬: 선명한 대비, 행사 강조",
+    "sage": "연한 세이지·짙은 녹색·오렌지: 산뜻하고 부드러운 대비",
+    "cobalt": "아이스 블루·네이비·코발트: 깨끗하고 또렷한 인상",
+    "ink": "차콜·아이보리·골드: 차분하고 깊은 대비",
+    "peach": "살구·크림·테라코타: 포근한 온기",
+    "burgundy": "아이보리·버건디: 대담한 글자와 빈티지한 온기",
+    "forest": "딥 그린·아이보리·골드: 깊고 고요한 인상",
+}
 
 
 def explicit_edits(instruction):
     suffix = r"(?:\s*(?:바꿔\s*줘|바꿔\s*주세요|변경해\s*줘|변경해\s*주세요|해\s*줘|해\s*주세요))?"
     colors = {"초록색": "sage", "초록": "sage", "파란색": "cobalt", "파랑": "cobalt",
               "분홍색": "peach", "분홍": "peach", "빨간색": "coral", "빨강": "coral",
-              "크림색": "cream", "어두운 색": "ink"}
+              "크림색": "cream", "어두운 색": "ink", "버건디": "burgundy", "짙은 초록색": "forest"}
     fonts = {"명조체": "serif", "명조": "serif", "고딕체": "sans", "고딕": "sans", "굵은 고딕": "bold"}
+    fonts.update({name: f.id for f in FONT_CHOICES for name in (f.id, f.name)})
+    fonts.update({"주아체": "jua", "주아": "jua", "도현체": "dohyeon", "도현": "dohyeon", "검은 고딕": "black_han_sans", "나눔펜": "nanum_pen"})
     templates = {name: t for t in TEMPLATES for name in (t.id, t.name)}
     changes = {}
     clauses = re.split(r"\s*(?:,|그리고|바꾸고|변경하고)\s*", instruction.strip().rstrip(".!"))
     for clause in clauses:
         color = re.fullmatch(r"(?:배경[을은]?\s*)?("+"|".join(colors)+r")(?:으로|로)"+suffix, clause)
-        font = re.fullmatch(r"(?:제목[을은]?\s*)?("+"|".join(fonts)+r")(?:으로|로)"+suffix, clause)
+        font = re.fullmatch(r"(?:제목(?:\s*서체)?[을은를]?\s*)?("+"|".join(map(re.escape, fonts))+r")(?:으로|로)"+suffix, clause)
         template = re.fullmatch(r"("+"|".join(map(re.escape, templates))+r")\s*템플릿으로"+suffix, clause)
         if color:
             changes["palette"] = colors[color[1]]

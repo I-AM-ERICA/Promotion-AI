@@ -9,6 +9,7 @@ from .renderer import normalize_image, vision_image
 from .storage import Conflict
 from .product_image import ProductProcessor
 from .templates import diverse_designs
+from .visual_profile import visual_profile, is_product_set
 
 
 class Engine:
@@ -59,10 +60,14 @@ class Engine:
             self.check(deadline, cancelled)
             photo, logo = normalize_image(brief.product_image), normalize_image(brief.logo)
             reference = normalize_image(brief.style_reference)
-            processed = self.processor.process(photo, brief.background_mode)
+            mode = "keep" if brief.background_mode == "auto" and is_product_set(brief.product) else brief.background_mode
+            processed = self.processor.process(photo, mode)
+            if mode == "keep" and brief.background_mode == "auto" and photo:
+                processed.warning = "세트 상품은 구성을 보존하도록 원본 사진을 사용했습니다. 배경을 분리하려면 '배경 제거하기'를 선택해 주세요."
             self.check(deadline, cancelled)
             style = self.designer.analyze_style(vision_image(reference), deadline) if reference else ""
-            designs = diverse_designs(self.designer.designs(brief, deadline, style=style))
+            profile = visual_profile(processed.data, brief)
+            designs = diverse_designs(self.designer.designs(brief, deadline, style=style, visual_context=profile), profile)
             prepared = []
             for design in designs:
                 self.check(deadline, cancelled)

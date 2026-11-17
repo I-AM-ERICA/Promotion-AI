@@ -9,7 +9,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from .clova import ProviderError
 from .models import Brief, Revision
 from .storage import NotFound, Conflict
-from .templates import TEMPLATES
+from .templates import TEMPLATES, default_font
+from .font_catalog import public_fonts, FONT_BY_ID
 
 STATIC = Path(__file__).parent / "static"
 MAX_BODY = 22 * 1024 * 1024
@@ -97,6 +98,10 @@ def create_app(engine):
     def templates():
         return {"templates": [t.__dict__ for t in TEMPLATES]}
 
+    @app.get("/v1/fonts", dependencies=[Depends(authorize)])
+    def fonts():
+        return {"fonts": public_fonts()}
+
     @app.post("/v1/posters/drafts", dependencies=[Depends(authorize)])
     def create(brief: Brief):
         return engine.create(brief)
@@ -129,7 +134,7 @@ def create_app(engine):
     def studio(request: Request):
         if not engine.settings.studio or not local(request):
             raise HTTPException(404)
-        config = json.dumps({"token": studio_token, "mode": "demo" if engine.settings.demo else "clova"})
+        config = json.dumps({"token": studio_token, "mode": "demo" if engine.settings.demo else "clova", "fonts": public_fonts(), "templateFonts": {t.id: default_font(t.id) for t in TEMPLATES}})
         html = (STATIC / "index.html").read_text(encoding="utf-8").replace("__CONFIG__", config)
         return HTMLResponse(html, headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY",
                                           "Referrer-Policy": "no-referrer"})
@@ -139,5 +144,11 @@ def create_app(engine):
         if not engine.settings.studio or not local(request) or asset not in ("studio.css", "studio.js", "sample-product.png"):
             raise HTTPException(404)
         return FileResponse(STATIC / asset)
+
+    @app.get("/studio/font-preview/{font_id}.png")
+    def font_preview(font_id: str, request: Request):
+        if not engine.settings.studio or not local(request) or font_id not in FONT_BY_ID:
+            raise HTTPException(404)
+        return Response(engine.renderer.font_preview(font_id), media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
     return app

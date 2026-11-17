@@ -175,6 +175,39 @@ def test_api_rejects_unknown_fields_without_echoing_input(engine,brief):
         assert r.status_code==422 and "secret-private-data" not in r.text
 
 
+def test_fonts_catalog_and_local_previews_keep_access_boundaries(engine):
+    with TestClient(create_app(engine)) as client:
+        assert client.get("/v1/fonts").status_code==401
+        response=client.get("/v1/fonts",headers={"X-Internal-Key":"test-key"})
+        assert response.status_code==200
+        fonts=response.json()["fonts"]
+        assert len(fonts)==10 and all(set(f)=={"id","name","description"} for f in fonts)
+        preview=client.get("/studio/font-preview/jua.png",headers={"Host":"localhost"})
+        assert preview.status_code==200 and Image.open(BytesIO(preview.content)).size==(800,130)
+        assert client.get("/studio/font-preview/unknown.png",headers={"Host":"localhost"}).status_code==404
+        assert client.get("/studio/font-preview/jua.png",headers={"Host":"remote.example"}).status_code==404
+        from dataclasses import replace
+        engine.settings=replace(engine.settings,studio=False)
+        assert client.get("/studio/font-preview/jua.png",headers={"Host":"localhost"}).status_code==404
+
+
+@pytest.mark.parametrize("requested,expected",[("auto","keep"),("remove","remove"),("keep","keep")])
+def test_sets_preserve_original_by_default_but_allow_explicit_cutout(engine,brief,requested,expected):
+    from promotion_assistant.product_image import ProductImage
+    from promotion_assistant.models import ImageInput
+    from examples.product_fixtures import fixture_bytes
+    class Processor:
+        def process(self,data,mode):
+            assert mode==expected
+            return ProductImage(data,"kept" if mode=="keep" else "removed")
+    engine.processor=Processor()
+    product=ImageInput(base64=base64.b64encode(fixture_bytes("set")).decode(),media_type="image/png")
+    request=brief.model_copy(update={"product":"생활용품 선물세트","product_image":product,"background_mode":requested})
+    drafts=engine.create(request)["drafts"]
+    assert all(d["image_processing"]["background"]==("kept" if expected=="keep" else "removed") for d in drafts)
+    assert bool(drafts[0]["image_processing"]["warning"])==(requested=="auto")
+
+
 def test_api_rejects_oversized_body_before_parsing(engine):
     with TestClient(create_app(engine)) as client:
         result=client.post("/v1/posters/drafts",content=b"x"*(22*1024*1024+1))

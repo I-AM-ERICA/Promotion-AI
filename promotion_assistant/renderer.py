@@ -7,8 +7,10 @@ import os
 import warnings
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 from .product_image import has_transparency
-from .templates import PALETTES
+from .templates import PALETTES, TEMPLATES, default_font
+import math
 from .typography import wrap_text
+from .font_catalog import FONT_BY_ID, ROOT as FONT_ROOT
 
 WIDTH, HEIGHT = 1080, 1350
 Image.MAX_IMAGE_PIXELS = 20_000_000
@@ -59,6 +61,7 @@ class LayoutError(ValueError):
 def find_font(custom="", bold=False):
     candidates = [custom] if custom else []
     candidates += [
+        str(FONT_ROOT / ("nanumgothic/NanumGothic-Bold.ttf" if bold else "nanumgothic/NanumGothic-Regular.ttf")),
         "C:/Windows/Fonts/malgunbd.ttf" if bold else "C:/Windows/Fonts/malgun.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/System/Library/Fonts/AppleSDGothicNeo.ttc",
@@ -77,19 +80,29 @@ class Renderer:
         self.serif_bold = str(Path(__file__).parent / "fonts/NanumMyeongjo-ExtraBold.ttf")
 
     @lru_cache(maxsize=100)
-    def font(self, size, bold=False, serif=False):
+    def font(self, size, bold=False, serif=False, family="auto"):
+        if family not in ("auto", "sans", "serif", "bold"):
+            return ImageFont.truetype(str(FONT_ROOT / FONT_BY_ID[family].path), size)
         path = (self.serif_bold if bold else self.serif) if serif else (self.bold if bold else self.regular)
         return ImageFont.truetype(path, size)
 
     def wrap(self, text, font, width, balanced=False):
         return wrap_text(text, font, width, balanced=balanced)
 
-    def text(self, draw, text, box, color, size=48, minimum=20, bold=False, align="left", *, serif=False, balanced=False, leading=1.35):
+    @lru_cache(maxsize=20)
+    def font_preview(self, family):
+        canvas = Image.new("RGB", (800, 130), "#F6F4ED")
+        self.text(ImageDraw.Draw(canvas), "우리 가게의 특별한 순간", (24, 27, 752, 88), "#243B30",
+                  48, 24, family == "bold", serif=family == "serif", family=family)
+        output = BytesIO(); canvas.save(output, "PNG")
+        return output.getvalue()
+
+    def text(self, draw, text, box, color, size=48, minimum=20, bold=False, align="left", *, serif=False, balanced=False, leading=1.35, family="auto"):
         if not text:
             return 0
         x, y, w, h = box
         for value in range(size, minimum - 1, -1):
-            font = self.font(value, bold, serif)
+            font = self.font(value, bold, serif, family)
             lines = self.wrap(text, font, w, balanced)
             step = round(value * leading)
             if len(lines) * step <= h and all(font.getlength(line) <= w for line in lines):
@@ -99,7 +112,7 @@ class Renderer:
                 return len(lines) * step
         raise LayoutError("문구가 포스터 영역에 맞지 않습니다. 글귀를 조금 줄여 주세요.")
 
-    def photo(self, canvas, data, box, panel, ink, product, fit="contain", radius=10):
+    def photo(self, canvas, data, box, panel, ink, product, fit="contain", radius=10, angle=0):
         x, y, w, h = map(int, box)
         if min(w, h) < 100:
             raise LayoutError("상품 사진을 배치할 공간이 부족합니다. 글귀를 줄여 주세요.")
@@ -110,6 +123,8 @@ class Renderer:
                 bounds = source.getchannel("A").point(lambda v: 255 if v > 16 else 0).getbbox()
                 if bounds:
                     source = source.crop(bounds)
+                if angle and source.width/source.height > 1.3:
+                    source = source.rotate(angle, Image.Resampling.BICUBIC, expand=True)
                 # Transparent assets float on the layout, with breathing room for a soft shadow.
                 scale = min(w*.88/source.width, h*.86/source.height)
                 source = source.resize((max(1, round(source.width*scale)), max(1, round(source.height*scale))), Image.Resampling.LANCZOS)
@@ -156,11 +171,28 @@ class Renderer:
             self.text(draw, f"{discount}% 할인", (x+length+24, py-2, w-length-24, 38),
                       fg, 25, 18, True)
 
+    def headline_family(self, design):
+        if design.typography != "auto":
+            return design.typography
+        return default_font(design.template_id)
+
     def render(self, brief, design, product_image=None, logo=None):
+        try:
+            return self._render_design(brief, design, product_image, logo)
+        except LayoutError:
+            # Dense factual inputs need more room, not truncated product details.
+            return self._render_compact(brief, design, product_image, logo)
+
+    def _render_design(self, brief, design, product_image=None, logo=None):
         bg, fg, accent, panel, muted = PALETTES[design.palette]
         canvas = Image.new("RGB", (WIDTH, HEIGHT), bg)
         d = ImageDraw.Draw(canvas)
         variant = design.template_id
+        if variant == "spotlight":
+            glow = Image.new("L", (108, 135))
+            glow.putdata([round(90*math.exp(-((x-54)**2/1050+(y-57)**2/1300))) for y in range(135) for x in range(108)])
+            glow = glow.resize((WIDTH, HEIGHT), Image.Resampling.BICUBIC)
+            canvas.paste(Image.new("RGB", (WIDTH, HEIGHT), panel), (0, 0), glow)
         offer = variant in ("bold_sale", "split")
         bottom_price = brief.price is not None and not offer
         detail = "\n".join(x for x in [brief.product, brief.message] if x)
@@ -178,15 +210,16 @@ class Renderer:
         if top_end < 600:
             raise LayoutError("문구와 상품 사진을 함께 배치하기 어렵습니다. 메시지를 줄여 주세요.")
         required = {"split": 860 if brief.price is not None else 680,
-                    "soft_frame": 705, "market": 720}.get(variant, 600)
+                    "soft_frame": 705, "market": 720, "type_stack": 730,
+                    "spotlight": 710, "magazine": 760, "diagonal": 740}.get(variant, 600)
         if top_end < required:
             raise LayoutError("이 구도에 문구가 모두 들어가지 않습니다. 메시지를 줄여 주세요.")
-        serif = design.typography == "serif" or design.typography == "auto" and variant in ("editorial", "night", "soft_frame")
-        bold = design.typography == "bold" or design.typography == "auto" and not serif
+        family = self.headline_family(design)
+        serif, bold = family == "serif", family == "bold"
 
         def title(box, size=86, align="left"):
             return self.text(d, design.headline, box, fg, size, 30, bold, align,
-                             serif=serif, balanced=True, leading=1.18)
+                             serif=serif, balanced=True, leading=1.18, family=family)
 
         def subtitle(box, align="left"):
             return self.text(d, design.subhead, box, muted, 29, 19, False, align)
@@ -245,6 +278,38 @@ class Renderer:
             photo_y = max(367, 181+used+24)
             photo((434, photo_y, 574, top_end-photo_y))
             d.line((76, top_end-16, 274, top_end-16), fill=accent, width=3)
+        elif variant == "type_stack":
+            title((72, 140, 936, 95), 58, "center")
+            band_height = min(190, (top_end-250)//3)
+            for row in range(3):
+                y = 250 + row*band_height
+                self.text(d, brief.product, (40, y, 1000, band_height), fg, 185, 30, True, "center",
+                          family=family, balanced=True, leading=1.05)
+            photo((72, 246, 936, top_end-246))
+            # Product details below remain fully readable; background words are decorative.
+        elif variant == "magazine":
+            d.line((72, 126, 1008, 126), fill=muted, width=1)
+            title((72, 165, 402, 300), 100)
+            subtitle((76, 500, 330, min(180, top_end-520)))
+            photo((494, 215, 514, top_end-215))
+            d.line((76, top_end-20, 235, top_end-20), fill=accent, width=2)
+        elif variant == "spotlight":
+            title((72, 150, 936, 150), 100, "center")
+            subtitle((140, 306, 800, 80), "center")
+            d.ellipse((180, top_end-78, 900, top_end-6), fill=panel)
+            d.line((180, top_end-40, 900, top_end-40), fill=muted, width=1)
+            photo((130, 378, 820, top_end-378))
+        elif variant == "diagonal":
+            d.rectangle((565, 136, 1008, top_end), fill=panel)
+            title((72, 161, 936, 156), 94)
+            subtitle((76, 333, 800, 78))
+            label = Image.new("RGBA", (max(100, round(top_end-430)), 145))
+            self.text(ImageDraw.Draw(label), brief.product, (0, 0, label.width, 140), fg, 105, 24,
+                      True, family="dohyeon", leading=1.1)
+            label = label.transpose(Image.Transpose.ROTATE_90)
+            canvas.paste(label, (825, 420), label)
+            self.photo(canvas, product_image, (65, 422, 900, top_end-422), panel, fg,
+                       brief.product, design.image_fit, 12, angle=-12)
         else:  # market: the product leads, copy follows.
             photo_end = max(440, top_end-280)
             d.ellipse((202, 147, 878, photo_end), fill=panel)
@@ -266,4 +331,55 @@ class Renderer:
         self.text(d, brief.contact or brief.store.region, (600, 1266, 408, 53), muted, 22, 16)
         output = BytesIO()
         canvas.save(output, "PNG", optimize=True)
+        return output.getvalue()
+
+    def _render_compact(self, brief, design, product_image=None, logo=None):
+        bg, fg, accent, panel, muted = PALETTES[design.palette]
+        canvas = Image.new("RGB", (WIDTH, HEIGHT), bg)
+        d = ImageDraw.Draw(canvas)
+        family = self.headline_family(design)
+        group = next(t.family for t in TEMPLATES if t.id == design.template_id)
+        detail = "\n".join([brief.product, " ".join(brief.message.split())]).strip()
+        footer = brief.contact or brief.store.region
+        footer_h = 40+len(self.wrap(footer, self.font(18), 936))*25 if footer else 40
+        footer_y = HEIGHT-42-footer_h
+        period_h = len(self.wrap(brief.period, self.font(20), 936))*28 if brief.period else 0
+        price_h = 126 if brief.price is not None else 0
+        for body_size in (23, 21, 19, 18):
+            detail_h = len(self.wrap(detail, self.font(body_size), 936))*round(body_size*1.35)
+            facts_y = footer_y-24-period_h-detail_h-price_h-20
+            if facts_y >= 620:
+                break
+        if facts_y < 620:
+            raise LayoutError("입력한 문구가 너무 깁니다. 메시지를 조금 줄여 주세요.")
+        self.text(d, brief.store.name, (72, 54, 750, 55), fg, 27, 18, True)
+        if logo:
+            im=Image.open(BytesIO(logo)).convert("RGBA");im.thumbnail((150,65))
+            canvas.paste(im,(1008-im.width,50),im)
+        d.line((72,126,1008,126),fill=muted,width=1)
+        title_args = {"serif": family == "serif", "family": family, "balanced": True, "leading": 1.2}
+        if group == "offer":
+            self.text(d, design.headline, (72, 165, 420, 225), fg, 74, 24, family=="bold", **title_args)
+            self.text(d, design.subhead, (76, 410, 410, facts_y-440), muted, 25, 18)
+            self.photo(canvas,product_image,(540,160,468,facts_y-185),panel,fg,brief.product,design.image_fit,30)
+        elif group == "brand":
+            self.text(d,design.headline,(72,165,936,142),fg,70,24,family=="bold",**title_args)
+            self.text(d,design.subhead,(76,345,320,facts_y-375),muted,25,18)
+            self.photo(canvas,product_image,(435,325,573,facts_y-350),panel,fg,brief.product,design.image_fit,24)
+        else:
+            used=self.text(d,design.headline,(72,160,936,150),fg,74,24,family=="bold",**title_args)
+            used_sub=self.text(d,design.subhead,(76,175+used,920,80),muted,25,18)
+            photo_y=195+used+used_sub
+            self.photo(canvas,product_image,(72,photo_y,936,facts_y-photo_y-24),panel,fg,brief.product,design.image_fit,24)
+        y=facts_y
+        if brief.price is not None:
+            self.price(d,brief,(72,y,936,price_h),fg,accent,muted,large=True);y+=price_h
+        self.text(d,detail,(72,y,936,detail_h),fg,body_size,body_size);y+=detail_h+12
+        if brief.period:
+            self.text(d,brief.period,(72,y,936,period_h),muted,20,20)
+        d.line((72,footer_y,1008,footer_y),fill=muted,width=1)
+        self.text(d,design.cta,(72,footer_y+12,936,36),fg,24,18,True)
+        if footer:
+            self.text(d,footer,(72,footer_y+49,936,footer_h-34),muted,18,18)
+        output=BytesIO();canvas.save(output,"PNG",optimize=True)
         return output.getvalue()

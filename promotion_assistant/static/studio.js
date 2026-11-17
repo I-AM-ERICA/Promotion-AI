@@ -4,8 +4,8 @@ const $ = (id) => document.getElementById(id);
 let drafts = [], selected = 0, busy = false, uploads = 0;
 let images = {product_image: null, logo: null, style_reference: null};
 const storeId = 'local-studio';
-const templateNames = {editorial:'시그니처', bold_sale:'위크엔드 딜', soft_frame:'작은 선물', split:'컬렉션', night:'프리미엄', market:'동네의 발견'};
-const swatches = {editorial:'#e8dfcf', bold_sale:'#f44835', soft_frame:'#f5d6c4', split:'#7e9fd4', night:'#344044', market:'#bdd0a4'};
+const templateNames = {editorial:'시그니처', bold_sale:'위크엔드 딜', soft_frame:'작은 선물', split:'컬렉션', night:'프리미엄', market:'동네의 발견',type_stack:'타이포 팝',magazine:'매거진',spotlight:'스튜디오 글로우',diagonal:'다이내믹'};
+const swatches = {editorial:'#e8dfcf', bold_sale:'#f44835', soft_frame:'#f5d6c4', split:'#7e9fd4', night:'#344044', market:'#bdd0a4',type_stack:'#932a30',magazine:'#e8dfcf',spotlight:'#41695a',diagonal:'#245be6'};
 $('mode').textContent = config.mode === 'demo' ? '체험 모드 · AI 호출 없음' : 'CLOVA Studio 연결';
 if (config.mode === 'demo') {
   $('reference').disabled = true;
@@ -21,6 +21,7 @@ function lock(value) {
   $('sample').disabled=value || uploads>0;
   $('generate').disabled=value || uploads>0;
   $('revise').disabled=value;
+  $('font-apply').disabled=value;$('font-select').disabled=value;
   document.querySelectorAll('.template,.suggestions button,.draft-card').forEach(b=>b.disabled=value);
 }
 async function api(path, body) {
@@ -71,7 +72,7 @@ $('sample').onclick=async()=>{
     $('message').value='바삭한 첫입, 촉촉한 속.\n오늘의 작은 여유를 담았어요.';
     $('price').value='3500';$('original-price').value='4000';
     $('period').value='11.20 – 11.27';$('contact').value='성수동 · 매장 포장 가능';
-    $('sample-note').hidden=false;preview();message('예시를 채웠어요. 시안 3개 만들기를 눌러 보세요.');
+    $('sample-note').hidden=false;preview();message('예시를 채웠어요. 포스터 3개 만들기를 눌러 보세요.');
   }catch(error){message(error.message,true);}
   finally{uploads--;lock(false);}
 };
@@ -99,13 +100,17 @@ function render(){
     image.onerror=()=>message('이미지를 불러오지 못했어요. 서버의 이미지 주소 설정을 확인해 주세요.',true);
     const meta=document.createElement('div');meta.className='draft-meta';
     const name=document.createElement('strong');name.textContent=templateNames[draft.design.template_id];
-    const families={editorial:'상품 중심',market:'상품 중심',bold_sale:'가격 중심',split:'가격 중심',soft_frame:'여백·서체 중심',night:'여백·서체 중심'};
+    const families={editorial:'상품 중심',market:'상품 중심',type_stack:'상품 중심',spotlight:'상품 중심',bold_sale:'가격 중심',split:'가격 중심',diagonal:'가격 중심',soft_frame:'여백·서체 중심',night:'여백·서체 중심',magazine:'여백·서체 중심'};
     const version=document.createElement('small');version.textContent=families[draft.design.template_id]+' · v'+draft.version;
     meta.append(name,version);card.append(image,meta);
     card.onclick=()=>{if(!busy){selected=index;render();}};
     $('drafts').append(card);
   });
   const draft=drafts[selected];
+  if(!$('font-select').options.length){
+    for(const font of config.fonts){const option=document.createElement('option');option.value=font.id;option.textContent=font.name;$('font-select').append(option);}
+  }
+  $('font-select').value=draft.design.typography || 'auto';fontPreview();
   const processing=draft.image_processing || {};
   $('image-status').textContent=processing.warning || ({removed:'상품 배경을 제거하고 부드러운 그림자를 더했어요.',transparent:'투명한 상품 이미지에 부드러운 그림자를 더했어요.',kept:'원본 사진의 배경을 유지했어요.'}[processing.background] || '');
   $('image-status').hidden=!$('image-status').textContent;
@@ -115,7 +120,7 @@ function render(){
   $('templates').replaceChildren();
   for(const [id,name] of Object.entries(templateNames)){
     const button=document.createElement('button');button.type='button';button.className='template';button.setAttribute('aria-pressed',String(draft.design.template_id===id));
-    const art=document.createElement('i');art.style.setProperty('--swatch',swatches[id]);button.append(art,document.createTextNode(name));
+    const art=document.createElement('i');art.dataset.layout=id;art.style.setProperty('--swatch',swatches[id]);button.append(art,document.createTextNode(name));
     button.onclick=()=>revise(id+' 템플릿으로 바꿔줘');$('templates').append(button);
   }
 }
@@ -129,6 +134,15 @@ async function revise(instruction){
   finally{lock(false);}
 }
 $('revise').onclick=()=>revise($('instruction').value);
+function fontPreview(){
+  const font=config.fonts.find(font=>font.id===$('font-select').value);
+  if(!font)return;
+  $('font-description').textContent=font.description;
+  const previewId=font.id==='auto'&&drafts.length?config.templateFonts[drafts[selected].design.template_id]:font.id;
+  $('font-preview').src='/studio/font-preview/'+encodeURIComponent(previewId)+'.png';
+}
+$('font-select').onchange=fontPreview;
+$('font-apply').onclick=()=>revise('제목 서체를 '+$('font-select').value+'로 바꿔줘');
 $('instruction').onkeydown=(event)=>{if(event.key==='Enter'){event.preventDefault();revise($('instruction').value);}};
 document.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>revise(button.dataset.edit));
 $('copy-caption').onclick=async()=>{try{await navigator.clipboard.writeText($('caption').textContent);message('홍보 문구를 복사했어요.');}catch{message('복사 권한을 확인해 주세요.',true);}};

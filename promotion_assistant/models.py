@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import base64
 from .copy_guard import unsupported_claims
+from .font_catalog import TypographyId
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
-TemplateId = Literal["editorial", "bold_sale", "soft_frame", "split", "night", "market"]
-PaletteId = Literal["cream", "coral", "sage", "cobalt", "ink", "peach"]
+TemplateId = Literal["editorial", "bold_sale", "soft_frame", "split", "night", "market", "type_stack", "magazine", "spotlight", "diagonal"]
+PaletteId = Literal["cream", "coral", "sage", "cobalt", "ink", "peach", "burgundy", "forest"]
 
 
 class Model(BaseModel):
@@ -68,7 +69,7 @@ class Design(Model):
     cta: str = Field(default="매장에서 만나보세요", max_length=24)
     emphasis: Literal["product", "price"] = "product"
     image_fit: Literal["contain", "cover"] = "contain"
-    typography: Literal["auto", "sans", "serif", "bold"] = "auto"
+    typography: TypographyId = "auto"
 
     @field_validator("headline", "subhead", "cta")
     @classmethod
