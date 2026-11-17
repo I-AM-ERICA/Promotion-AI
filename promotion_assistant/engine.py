@@ -8,6 +8,7 @@ from .models import Brief, Design, validate_copy
 from .renderer import normalize_image, vision_image
 from .storage import Conflict
 from .product_image import ProductProcessor
+from .templates import diverse_designs
 
 
 class Engine:
@@ -55,12 +56,13 @@ class Engine:
     def create(self, brief: Brief, *, deadline=None, cancelled=lambda: False):
         deadline = min(deadline or float("inf"), time.monotonic() + self.settings.timeout)
         with self.slot():
+            self.check(deadline, cancelled)
             photo, logo = normalize_image(brief.product_image), normalize_image(brief.logo)
             reference = normalize_image(brief.style_reference)
             processed = self.processor.process(photo, brief.background_mode)
             self.check(deadline, cancelled)
             style = self.designer.analyze_style(vision_image(reference), deadline) if reference else ""
-            designs = self.designer.designs(brief, deadline, style=style)
+            designs = diverse_designs(self.designer.designs(brief, deadline, style=style))
             prepared = []
             for design in designs:
                 self.check(deadline, cancelled)

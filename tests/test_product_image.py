@@ -60,3 +60,24 @@ def test_existing_database_migrates_without_losing_original(tmp_path):
     with repository.connect() as db:
         row=db.execute("SELECT photo,cutout FROM projects").fetchone()
         assert row["photo"]==b"original" and row["cutout"]==b"cutout"
+
+
+def test_three_drafts_and_revision_reuse_one_cutout(tmp_path):
+    import base64
+    from promotion_assistant.clova import DemoDesigner
+    from promotion_assistant.config import Settings
+    from promotion_assistant.engine import Engine
+    from promotion_assistant.models import Revision
+    from promotion_assistant.renderer import Renderer
+    session=Segmenter()
+    source=png(Image.new("RGB",(200,200),(230,120,40)))
+    brief=Brief(store={"store_id":"1","name":"가게"},product="상품",price=3500,
+                product_image={"base64":base64.b64encode(source).decode(),"media_type":"image/png"})
+    engine=Engine(Settings(internal_key="test",demo=True,data_dir=tmp_path),DemoDesigner(),
+                  Renderer(),Repository(tmp_path),ProductProcessor(session))
+    drafts=engine.create(brief)["drafts"]
+    assert len(drafts)==3 and session.calls==1
+    assert all(d["image_processing"]["background"]=="removed" for d in drafts)
+    changed=engine.revise(drafts[0]["id"],Revision(store_id="1",instruction="명조체로",expected_version=1))
+    assert changed["design"]["typography"]=="serif" and session.calls==1
+    assert changed["image_processing"]==drafts[0]["image_processing"]

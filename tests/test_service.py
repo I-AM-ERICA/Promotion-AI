@@ -89,7 +89,7 @@ def test_live_revision_and_style_use_separate_naver_models(brief):
         return success({"design":current.model_dump()|{"palette":"sage"},"needs_fact_edit":False})
     designer=clova_client(handler)
     style=designer.analyze_style(b"image",time.monotonic()+5)
-    result=designer.designs(brief,time.monotonic()+5,style=style,current=current,instruction="초록색으로")
+    result=designer.designs(brief,time.monotonic()+5,style=style,current=current,instruction="초록을 주조색으로 차분하고 고급스럽게")
     assert result[0].palette=="sage"
     assert [s.rsplit("/",1)[-1] for s in seen]==["HCX-005","HCX-007"]
 

@@ -8,6 +8,7 @@ import warnings
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 from .product_image import has_transparency
 from .templates import PALETTES
+from .typography import wrap_text
 
 WIDTH, HEIGHT = 1080, 1350
 Image.MAX_IMAGE_PIXELS = 20_000_000
@@ -72,32 +73,25 @@ class Renderer:
     def __init__(self, font_path="", bold_font_path=""):
         self.regular = find_font(font_path)
         self.bold = find_font(bold_font_path or font_path, True)
+        self.serif = str(Path(__file__).parent / "fonts/NanumMyeongjo-Regular.ttf")
+        self.serif_bold = str(Path(__file__).parent / "fonts/NanumMyeongjo-ExtraBold.ttf")
 
     @lru_cache(maxsize=100)
-    def font(self, size, bold=False):
-        return ImageFont.truetype(self.bold if bold else self.regular, size)
+    def font(self, size, bold=False, serif=False):
+        path = (self.serif_bold if bold else self.serif) if serif else (self.bold if bold else self.regular)
+        return ImageFont.truetype(path, size)
 
-    def wrap(self, text, font, width):
-        lines = []
-        for para in text.split("\n"):
-            line = ""
-            for char in para:
-                if font.getlength(line + char) > width and line:
-                    lines.append(line.rstrip())
-                    line = char.lstrip()
-                else:
-                    line += char
-            lines.append(line.rstrip())
-        return lines
+    def wrap(self, text, font, width, balanced=False):
+        return wrap_text(text, font, width, balanced=balanced)
 
-    def text(self, draw, text, box, color, size=48, minimum=20, bold=False, align="left"):
+    def text(self, draw, text, box, color, size=48, minimum=20, bold=False, align="left", *, serif=False, balanced=False, leading=1.35):
         if not text:
             return 0
         x, y, w, h = box
         for value in range(size, minimum - 1, -1):
-            font = self.font(value, bold)
-            lines = self.wrap(text, font, w)
-            step = round(value * 1.35)
+            font = self.font(value, bold, serif)
+            lines = self.wrap(text, font, w, balanced)
+            step = round(value * leading)
             if len(lines) * step <= h and all(font.getlength(line) <= w for line in lines):
                 for index, line in enumerate(lines):
                     offset = (w - font.getlength(line)) / 2 if align == "center" else 0
@@ -144,103 +138,132 @@ class Renderer:
         ImageDraw.Draw(mask).rounded_rectangle((0, 0, w-1, h-1), radius=radius, fill=255)
         canvas.paste(frame, (x, y), mask)
 
+    def price(self, draw, brief, box, fg, accent, muted, *, large=False):
+        if brief.price is None:
+            return
+        x, y, w, h = box
+        sale_height = h-47 if brief.original_price is not None else h
+        self.text(draw, f"{brief.price:,}원", (x, y, w, sale_height), accent,
+                  128 if large else 66, 28, True, leading=1.15)
+        if brief.original_price is not None:
+            label = f"{brief.original_price:,}원"
+            font = self.font(24)
+            length = font.getlength(label)
+            py = y+sale_height+4
+            draw.text((x, py), label, font=font, fill=muted, anchor="lt")
+            draw.line((x, py+13, x+length, py+13), fill=muted, width=1)
+            discount = (brief.original_price-brief.price)*100//brief.original_price
+            self.text(draw, f"{discount}% 할인", (x+length+24, py-2, w-length-24, 38),
+                      fg, 25, 18, True)
+
     def render(self, brief, design, product_image=None, logo=None):
         bg, fg, accent, panel, muted = PALETTES[design.palette]
         canvas = Image.new("RGB", (WIDTH, HEIGHT), bg)
         d = ImageDraw.Draw(canvas)
-        # Facts are never copied from the model: exact owner text and computed price.
-        detail = "\n".join(x for x in [brief.product, brief.message] if x)
-        detail_font = 26
-        detail_lines = self.wrap(detail, self.font(detail_font), 936)
-        detail_height = len(detail_lines) * 35
-        price_height = (108 if design.emphasis == "price" else 82) if brief.price is not None else 0
-        period_height = 44 if brief.period else 0
-        facts_height = detail_height + price_height + period_height + 28
-        facts_y = 1230 - facts_height
-        top_end = facts_y - 26
-        if top_end < 550:
-            # Long copy gets a larger facts area through smaller but still legible type.
-            detail_font = 22
-            detail_height = len(self.wrap(detail, self.font(detail_font), 936)) * 30
-            facts_height = detail_height + price_height + period_height + 28
-            facts_y = 1230 - facts_height
-            top_end = facts_y - 26
-        if top_end < 490:
-            raise LayoutError("글귀가 너무 깁니다. 메시지를 줄여 주세요.")
-        title = design.headline
         variant = design.template_id
-        if variant == "night":
-            d.rectangle((27, 27, 1052, 1322), outline=accent, width=2)
-        self.text(d, brief.store.name, (72, 58, 760, 42), fg, 27, 20, True)
-        if logo:
-            im = Image.open(BytesIO(logo)).convert("RGBA")
-            im.thumbnail((150, 66), Image.Resampling.LANCZOS)
-            canvas.paste(im, (1008-im.width, 52), im)
-        else:
-            d.ellipse((973, 63, 1005, 95), fill=accent)
+        offer = variant in ("bold_sale", "split")
+        bottom_price = brief.price is not None and not offer
+        detail = "\n".join(x for x in [brief.product, brief.message] if x)
+        detail_font = 25
+        detail_height = len(self.wrap(detail, self.font(detail_font), 936))*34
+        price_height = (176 if design.emphasis == "price" else 128) if bottom_price else 0
+        period_height = 40 if brief.period else 0
+        facts_y = 1222-detail_height-period_height-price_height-16
+        top_end = facts_y-30
+        if top_end < 790:
+            detail_font = 21
+            detail_height = len(self.wrap(detail, self.font(detail_font), 936))*29
+            facts_y = 1222-detail_height-period_height-price_height-16
+            top_end = facts_y-30
+        if top_end < 600:
+            raise LayoutError("문구와 상품 사진을 함께 배치하기 어렵습니다. 메시지를 줄여 주세요.")
+        required = {"split": 860 if brief.price is not None else 680,
+                    "soft_frame": 705, "market": 720}.get(variant, 600)
+        if top_end < required:
+            raise LayoutError("이 구도에 문구가 모두 들어가지 않습니다. 메시지를 줄여 주세요.")
+        serif = design.typography == "serif" or design.typography == "auto" and variant in ("editorial", "night", "soft_frame")
+        bold = design.typography == "bold" or design.typography == "auto" and not serif
 
-        if variant == "split":
-            d.line((530, 145, 530, top_end), fill=accent, width=2)
-            self.text(d, title, (72, 167, 420, 255), fg, 86, 34, True)
-            self.text(d, design.subhead, (76, 438, 410, max(85, top_end-450)), muted, 32, 22)
-            self.photo(canvas, product_image, (558, 157, 450, top_end-157), panel, fg, brief.product, design.image_fit, 8)
-        else:
-            centered = variant in ("soft_frame", "night")
-            align = "center" if centered else "left"
-            title_y = 144
-            title_height = 166 if top_end < 700 else 207
-            title_size = 84 if centered else 96
-            self.text(d, title, (72, title_y, 936, title_height), fg, title_size, 36, True, align)
-            sub_y = title_y + title_height + 5
-            sub_height = 82
-            self.text(d, design.subhead, (74, sub_y, 932, sub_height), muted, 30, 20, False, align)
-            photo_y = sub_y + sub_height + 18
-            photo_h = top_end-photo_y
-            if photo_h < 130:
-                # Compact the headline area for very long factual text.
-                raise LayoutError("문구와 상품 사진을 함께 배치하기 어렵습니다. 메시지를 줄여 주세요.")
-            box = (72, photo_y, 936, photo_h)
-            radius = 8
-            if variant == "bold_sale":
-                d.ellipse((840, photo_y-26, 1030, photo_y+164), fill=accent)
-                box = (90, photo_y+10, 900, photo_h-10)
-                radius = 28
-            elif variant == "soft_frame":
-                d.rounded_rectangle((61, photo_y-11, 1019, top_end+11), radius=60, outline=accent, width=2)
-                box = (76, photo_y+4, 928, photo_h-8)
-                radius = 48
-            elif variant == "market":
-                d.rounded_rectangle((89, photo_y+15, 1023, top_end+15), radius=18, fill=accent)
-                radius = 18
-            elif variant == "night":
-                box = (90, photo_y, 900, photo_h)
-            else:
-                d.line((72, 120, 1008, 120), fill=muted, width=1)
+        def title(box, size=86, align="left"):
+            return self.text(d, design.headline, box, fg, size, 30, bold, align,
+                             serif=serif, balanced=True, leading=1.18)
+
+        def subtitle(box, align="left"):
+            return self.text(d, design.subhead, box, muted, 29, 19, False, align)
+
+        def photo(box, radius=12):
             self.photo(canvas, product_image, box, panel, fg, brief.product, design.image_fit, radius)
 
+        # Store identity and logo occupy a fixed safe area in every composition.
+        self.text(d, brief.store.name, (72, 56, 750, 52), fg, 27, 18, True)
+        if logo:
+            im = Image.open(BytesIO(logo)).convert("RGBA")
+            im.thumbnail((150, 65), Image.Resampling.LANCZOS)
+            canvas.paste(im, (1008-im.width, 50), im)
+        else:
+            d.ellipse((981, 65, 1005, 89), fill=accent)
+
+        if variant == "editorial":
+            d.line((72, 122, 1008, 122), fill=muted, width=1)
+            used = title((72, 164, 936, 210), 92)
+            sub_y = 164+used+24
+            sub_used = subtitle((76, sub_y, 850, 82))
+            photo_y = sub_y+sub_used+24
+            photo((65, photo_y, 950, top_end-photo_y))
+        elif variant == "bold_sale":
+            d.line((72, 125, 1008, 125), fill=fg, width=3)
+            title((72, 155, 936, 168), 88)
+            subtitle((76, 335, 890, 78))
+            if brief.price is not None:
+                self.price(d, brief, (72, 430, 936, 200), fg, accent, muted, large=True)
+                photo_top = 630
+            else:
+                photo_top = 430
+            # A broad colour field grounds the product; no sticker obscures it.
+            d.rounded_rectangle((72, photo_top, 1008, top_end), radius=38, fill=panel)
+            photo((78, photo_top+4, 924, top_end-photo_top-8), 32)
+        elif variant == "split":
+            d.rounded_rectangle((542, 146, 1008, top_end), radius=220, fill=panel)
+            title((72, 174, 430, 280), 79)
+            subtitle((76, 477, 414, 155))
+            if brief.price is not None:
+                self.price(d, brief, (72, max(650, top_end-220), 430, 180),
+                           fg, accent, muted, large=True)
+            photo((548, 160, 454, top_end-175), 180)
+        elif variant == "soft_frame":
+            photo_end = max(420, top_end-285)
+            d.rounded_rectangle((192, 142, 888, photo_end), radius=230, fill=panel)
+            photo((170, 145, 740, photo_end-145), 180)
+            title((72, photo_end+33, 936, 155), 77, "center")
+            subtitle((130, photo_end+202, 820, 78), "center")
+        elif variant == "night":
+            d.rectangle((29, 29, 1050, 1320), outline=accent, width=1)
+            d.line((72, 125, 1008, 125), fill=accent, width=1)
+            used = title((72, 181, 560, 300), 86)
+            subtitle((76, 510, 340, min(180, top_end-510)))
+            # Deliberately lower/right composition leaves a quiet column of copy.
+            photo_y = max(367, 181+used+24)
+            photo((434, photo_y, 574, top_end-photo_y))
+            d.line((76, top_end-16, 274, top_end-16), fill=accent, width=3)
+        else:  # market: the product leads, copy follows.
+            photo_end = max(440, top_end-280)
+            d.ellipse((202, 147, 878, photo_end), fill=panel)
+            photo((72, 140, 936, photo_end-140))
+            title((72, photo_end+28, 936, 158), 82)
+            subtitle((76, photo_end+202, 910, 76))
+
         y = facts_y
-        if brief.price is not None:
-            label = f"{brief.price:,}원"
-            price_size = 76 if design.emphasis == "price" else 58
-            self.text(d, label, (72, y, 680, price_height), accent, price_size, 34, True)
-            if brief.original_price is not None:
-                original = f"{brief.original_price:,}원"
-                ofont = self.font(25)
-                ow = ofont.getlength(original)
-                d.text((1008-ow, y+8), original, font=ofont, fill=muted, anchor="lt")
-                d.line((1008-ow, y+23, 1008, y+23), fill=muted, width=2)
-                # Integer arithmetic rounds DOWN, never exaggerates the discount.
-                discount = (brief.original_price-brief.price)*100//brief.original_price
-                self.text(d, f"{discount}% 할인", (740, y+43, 268, 43), fg, 28, 20, True, "center")
+        if bottom_price:
+            self.price(d, brief, (72, y, 936, price_height), fg, accent, muted,
+                       large=design.emphasis == "price")
             y += price_height
         self.text(d, detail, (72, y, 936, detail_height), fg, detail_font, detail_font)
-        y += detail_height + 10
+        y += detail_height+12
         if brief.period:
-            self.text(d, brief.period, (72, y, 936, period_height), muted, 25, 20)
+            self.text(d, brief.period, (72, y, 936, period_height), muted, 23, 18)
         d.line((72, 1247, 1008, 1247), fill=muted, width=1)
-        self.text(d, design.cta, (72, 1270, 500, 43), fg, 26, 20, True)
-        footer = brief.contact or brief.store.region
-        self.text(d, footer, (600, 1270, 408, 45), muted, 22, 16)
-        out = BytesIO()
-        canvas.save(out, "PNG", optimize=True)
-        return out.getvalue()
+        self.text(d, design.cta, (72, 1270, 500, 43), fg, 25, 18, True)
+        self.text(d, brief.contact or brief.store.region, (600, 1266, 408, 53), muted, 22, 16)
+        output = BytesIO()
+        canvas.save(output, "PNG", optimize=True)
+        return output.getvalue()

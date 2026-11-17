@@ -68,6 +68,7 @@ class Design(Model):
     cta: str = Field(default="매장에서 만나보세요", max_length=24)
     emphasis: Literal["product", "price"] = "product"
     image_fit: Literal["contain", "cover"] = "contain"
+    typography: Literal["auto", "sans", "serif", "bold"] = "auto"
 
     @field_validator("headline", "subhead", "cta")
     @classmethod

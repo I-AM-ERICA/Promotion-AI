@@ -99,7 +99,8 @@ function render(){
     image.onerror=()=>message('이미지를 불러오지 못했어요. 서버의 이미지 주소 설정을 확인해 주세요.',true);
     const meta=document.createElement('div');meta.className='draft-meta';
     const name=document.createElement('strong');name.textContent=templateNames[draft.design.template_id];
-    const version=document.createElement('small');version.textContent='시안 '+(index+1)+' · v'+draft.version;
+    const families={editorial:'상품 중심',market:'상품 중심',bold_sale:'가격 중심',split:'가격 중심',soft_frame:'여백·서체 중심',night:'여백·서체 중심'};
+    const version=document.createElement('small');version.textContent=families[draft.design.template_id]+' · v'+draft.version;
     meta.append(name,version);card.append(image,meta);
     card.onclick=()=>{if(!busy){selected=index;render();}};
     $('drafts').append(card);

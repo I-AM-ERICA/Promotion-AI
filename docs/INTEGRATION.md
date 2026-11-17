@@ -75,6 +75,11 @@ AI_MOCK_ENABLED=false
 | 11 | optional original_price | 판매가보다 큰 정가 |
 | 12 | period | 그대로 표시할 기간 |
 | 13 | contact | 방문·문의 안내 |
+| 14 | background_mode | auto(기본), remove, keep |
+
+`PosterDraft.image_processing_json`(필드 8)은 `{"background":"removed|transparent|kept|none","warning":"..."}`입니다. 프론트에서 warning을 표시하세요. HTTP 응답은 같은 내용을 `image_processing` 객체로 제공합니다. 기존 proto 클라이언트는 추가 필드를 무시하므로 기존 RPC도 계속 동작합니다.
+
+3개 시안은 상품 중심(hero), 가격 중심(offer), 여백·서체 중심(brand) 구도를 하나씩 반환합니다. 디자인 JSON의 `typography`는 auto/sans/serif/bold이며 자연어 수정으로 변경할 수 있습니다. 배경 모드 변경은 새 생성 요청에서 적용합니다.
 
 `PosterImage.data`는 **raw bytes**입니다. 프론트엔드 base64를 백엔드에서 한 번 디코딩해 ByteString으로 전달합니다. `media_type`은 image/png, image/jpeg, image/webp 중 하나입니다. 파일당 최대 5MiB, 최대 2천만 화소입니다.
 
@@ -112,6 +117,7 @@ gRPC 외에 같은 엔진의 HTTP API도 제공합니다. Spring 서버에서 �
   "message": "오늘의 작은 여유",
   "tone": "차분하고 고급스럽게",
   "price": 3500,
+  "background_mode": "auto",
   "original_price": 4000,
   "period": "11.20 – 11.27",
   "product_image": {"base64": "<접두사 없는 base64>", "media_type": "image/png"}
@@ -139,4 +145,6 @@ POSTER_PUBLIC_BASE_URL은 브라우저에서도 접근 가능한 주소여야 �
 - 사실 검증은 숫자 비교와 프롬프트 제약입니다. 효능·원산지 등 모든 텍스트 사실을 자동 검증하는 것은 아닙니다.
 - 동시에 생성 2건, 기본 요청 제한 70초. 초과/취소된 gRPC 요청은 저장 전에 확인합니다. HTTP 브라우저 연결 종료가 이미 진행 중인 공급자 요청을 즉시 중단시키지는 않습니다.
 - SQLite 트랜잭션/버전 비교로 동시 수정 충돌을 거절합니다. 이전 버전 PNG는 덮어쓰지 않습니다.
+- 원본 사진과 U2Net 알파 컷아웃을 함께 보관합니다. 배경 제거는 생성당 1회 수행하며 3개 시안 및 이후 수정에서 재사용합니다. 기존 SQLite에는 nullable cutout 열만 추가하여 이전 시안도 계속 열 수 있습니다.
+- 서버 시작 시 U2Net을 준비합니다. 모델 다운로드 시간은 요청 deadline에 포함되지 않습니다. 배포 때 rembg 캐시를 영속화하면 재다운로드를 피할 수 있습니다. 별도 학습이나 GPU가 필요하지 않습니다.
 - 파일 TTL/삭제 정책, 다중 프로세스의 전역 rate limit, 결제/사용량 계량은 후속 운영 작업입니다. 단일 프로세스로 배포하세요.
