@@ -6,6 +6,7 @@ import uuid
 import httpx
 from .models import Brief, Design, DesignBatch
 from .templates import TEMPLATES, PALETTES
+from .copy_guard import price_context
 
 
 class ProviderError(RuntimeError):
@@ -104,7 +105,7 @@ class ClovaDesigner:
 
     def designs(self, brief: Brief, deadline, style="", current=None, instruction=""):
         payload = {"facts": brief.facts(), "templates": [t.__dict__ for t in TEMPLATES],
-                   "style_description": style}
+                   "style_description": style, "verified_pricing": price_context(brief)}
         if current is None:
             payload["task"] = "서로 다른 템플릿을 사용하는 시안 3개를 만드세요."
             output_schema = {"type": "object", "properties": {"designs": {

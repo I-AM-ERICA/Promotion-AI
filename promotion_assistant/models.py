@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-import re
+from .copy_guard import unsupported_claims
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
@@ -95,12 +95,7 @@ class Revision(Model):
 
 def validate_copy(design: Design, brief: Brief):
     """Numeric claims may only repeat numeric facts supplied by the owner."""
-    source = " ".join(str(v) for v in brief.facts().values())
-    source += " " + " ".join(f"{v}원" for v in (brief.price, brief.original_price) if v is not None)
-    # Keep the unit: a supplied 4,000 won never authorizes a '4000%' claim.
-    numbers = lambda s: set(re.findall(r"\d+(?:\.\d+)?(?:[%A-Za-z가-힣]+)?", s.replace(",", "")))
-    proposed = numbers(design.headline + " " + design.subhead + " " + design.cta)
-    if not proposed.issubset(numbers(source)):
+    if unsupported_claims("\n".join([design.headline, design.subhead, design.cta]), brief):
         raise ValueError("입력 정보에 없는 숫자가 문구에 포함됐습니다. 다시 생성해 주세요.")
     if design.emphasis == "price" and brief.price is None:
         design = design.model_copy(update={"emphasis": "product"})
