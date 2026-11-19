@@ -77,9 +77,9 @@ AI_MOCK_ENABLED=false
 | 13 | contact | 방문·문의 안내 |
 | 14 | background_mode | auto(기본), remove, keep |
 
-`PosterDraft.image_processing_json`(필드 8)은 `{"background":"removed|transparent|kept|none","warning":"..."}`입니다. 프론트에서 warning을 표시하세요. HTTP 응답은 같은 내용을 `image_processing` 객체로 제공합니다. 기존 proto 클라이언트는 추가 필드를 무시하므로 기존 RPC도 계속 동작합니다.
+`PosterDraft.image_processing_json`(필드 8)은 `{"background":"removed|transparent|kept|none","warning":"...","source":"original|processed"}`입니다. `background`는 프로젝트의 배경 분리 처리 결과이고, `source`는 해당 시안이 사용한 사진입니다. `photo_mood`는 `source=original`로 공간 배경을 보존하며 다른 구도는 `processed`입니다. 프론트에서 원본 사용 여부와 warning을 표시하세요. 이전 시안에는 source가 없을 수 있습니다. HTTP 응답은 같은 내용을 `image_processing` 객체로 제공합니다. 기존 proto 클라이언트는 추가 필드를 무시하므로 기존 RPC도 계속 동작합니다.
 
-3개 시안은 상품 중심(hero), 가격 중심(offer), 여백·서체 중심(brand) 구도를 하나씩 반환합니다. 디자인 JSON의 `typography`는 auto/sans/serif/bold이며 자연어 수정으로 변경할 수 있습니다. 배경 모드 변경은 새 생성 요청에서 적용합니다.
+3개 시안은 상품 중심(hero), 정보·대비 중심(offer), 분위기 중심(brand) 구도를 하나씩 반환합니다. 디자인 JSON의 `typography`는 아래 글꼴 ID 목록을 사용하며 자연어 수정으로 변경할 수 있습니다. 배경 모드 변경은 새 생성 요청에서 적용합니다.
 
 `PosterImage.data`는 **raw bytes**입니다. 프론트엔드 base64를 백엔드에서 한 번 디코딩해 ByteString으로 전달합니다. `media_type`은 image/png, image/jpeg, image/webp 중 하나입니다. 파일당 최대 5MiB, 최대 2천만 화소입니다.
 
@@ -139,7 +139,9 @@ POSTER_PUBLIC_BASE_URL은 브라우저에서도 접근 가능한 주소여야 �
 
 ## 저장 · 동시성 · 실패 처리
 
-디자인 JSON의 `template_id`는 `editorial`, `bold_sale`, `soft_frame`, `split`, `night`, `market`, `type_stack`, `magazine`, `spotlight`, `diagonal`, `floating_type`, `big_focus`를 지원합니다. `typography`는 `auto`, `sans`, `bold`, `serif`, `gowun_batang`, `gowun_dodum`, `jua`, `dohyeon`, `black_han_sans`, `nanum_pen`입니다. 기존 ID와 proto 필드는 유지됩니다. 글꼴 수정은 `제목 서체를 jua로 바꿔줘`처럼 안정적인 ID를 사용하면 API 호출 없이 적용됩니다.
+디자인 JSON의 `template_id`는 `editorial`, `bold_sale`, `soft_frame`, `split`, `night`, `market`, `type_stack`, `magazine`, `spotlight`, `diagonal`, `floating_type`, `big_focus`, `orbit_script`, `service_board`, `photo_mood`, `cast_shadow`, `wave_split`, `edge_closeup`를 지원합니다. `typography`는 `auto`, `sans`, `bold`, `serif`, `gowun_batang`, `gowun_dodum`, `jua`, `dohyeon`, `black_han_sans`, `nanum_pen`입니다. 기존 ID와 proto 필드는 유지됩니다. 글꼴 수정은 `제목 서체를 jua로 바꿔줘`처럼 안정적인 ID를 사용하면 API 호출 없이 적용됩니다.
+
+템플릿 선택도 `edge_closeup 템플릿으로 바꿔줘`처럼 요청할 수 있습니다. 명시적 선택 시 팔레트·서체를 템플릿 기본값으로 바꾸고, `photo_mood`/`edge_closeup`은 `image_fit=cover`, 나머지는 `contain`으로 설정합니다. `사진 전체가 보이게 해줘`는 `contain`으로 변경하여 클로즈업에서도 상품 전체를 보존합니다. `photo_mood`와 다른 구도를 오갈 때 저장된 원본/컷아웃을 각각 읽으므로 배경 제거를 다시 호출하지 않습니다. 별도 DB 마이그레이션이나 proto 변경은 필요하지 않습니다.
 
 기본 생성 화면에는 상품 사진·상품명·가게명·소식·선택 가격만 노출하고, 기간/연락처와 상세 디자인은 접는 구성을 권장합니다. 생성된 3개 중 선택하여 바로 저장할 수 있어야 합니다. 상품명으로 세트/묶음을 확인하면 `background_mode=auto`에서는 원본을 보존합니다. `remove`를 명시하면 분리하며, 처리 결과는 기존 `image_processing` 필드로 안내합니다. 상품 윤곽 비율 분석과 긴 입력용 구도 전환은 서버 내부 처리이므로 요청 필드를 추가할 필요가 없습니다.
 
