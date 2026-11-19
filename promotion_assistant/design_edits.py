@@ -40,6 +40,7 @@ def explicit_edits(instruction):
         elif template:
             selected = templates[template[1]]
             changes.update(template_id=selected.id, palette=selected.palette, typography="auto")
+            changes["image_fit"] = "cover" if selected.id in ("photo_mood", "edge_closeup") else "contain"
         elif re.fullmatch(r"가격[을은]?\s*(?:더\s*)?강조"+suffix, clause):
             changes["emphasis"] = "price"
         elif clause in ("사진 전체 보기", "사진 전체가 보이게 해줘", "사진 전체"):

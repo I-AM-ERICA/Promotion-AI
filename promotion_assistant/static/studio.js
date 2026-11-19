@@ -2,10 +2,12 @@
 const config = JSON.parse(document.getElementById('studio-config').textContent);
 const $ = (id) => document.getElementById(id);
 let drafts = [], selected = 0, busy = false, uploads = 0;
+let templateFilter = 'new';
 let images = {product_image: null, logo: null, style_reference: null};
 const storeId = 'local-studio';
-const templateNames = {editorial:'시그니처', bold_sale:'위크엔드 딜', soft_frame:'작은 선물', split:'컬렉션', night:'프리미엄', market:'동네의 발견',type_stack:'타이포 팝',magazine:'매거진',spotlight:'스튜디오 글로우',diagonal:'다이내믹',floating_type:'플로팅 타입',big_focus:'빅 포커스'};
-const swatches = {editorial:'#e8dfcf', bold_sale:'#f44835', soft_frame:'#f5d6c4', split:'#7e9fd4', night:'#344044', market:'#bdd0a4',type_stack:'#932a30',magazine:'#e8dfcf',spotlight:'#41695a',diagonal:'#245be6',floating_type:'#3468ae',big_focus:'#ad450f'};
+const templateNames = Object.fromEntries(config.templates.map(t=>[t.id,t.name]));
+const swatches = Object.fromEntries(config.templates.map(t=>[t.id,t.preview_color]));
+$('template-count').textContent = config.templates.length+'가지 템플릿';
 $('mode').textContent = config.mode === 'demo' ? '체험 모드 · AI 호출 없음' : 'CLOVA Studio 연결';
 if (config.mode === 'demo') {
   $('reference').disabled = true;
@@ -100,8 +102,9 @@ function render(){
     image.onerror=()=>message('이미지를 불러오지 못했어요. 서버의 이미지 주소 설정을 확인해 주세요.',true);
     const meta=document.createElement('div');meta.className='draft-meta';
     const name=document.createElement('strong');name.textContent=templateNames[draft.design.template_id];
-    const families={editorial:'상품 중심',market:'상품 중심',type_stack:'상품 중심',spotlight:'상품 중심',bold_sale:'가격 중심',split:'가격 중심',diagonal:'가격 중심',floating_type:'타이포·대비 중심',big_focus:'상품·크기감 중심',soft_frame:'여백·서체 중심',night:'여백·서체 중심',magazine:'여백·서체 중심'};
-    const version=document.createElement('small');version.textContent=families[draft.design.template_id]+' · v'+draft.version;
+    const template=config.templates.find(t=>t.id===draft.design.template_id);
+    const families={hero:'상품 중심',offer:'정보·대비 중심',brand:'분위기 중심'};
+    const version=document.createElement('small');version.textContent=families[template.family]+' · v'+draft.version;
     meta.append(name,version);card.append(image,meta);
     card.onclick=()=>{if(!busy){selected=index;render();}};
     $('drafts').append(card);
@@ -112,18 +115,26 @@ function render(){
   }
   $('font-select').value=draft.design.typography || 'auto';fontPreview();
   const processing=draft.image_processing || {};
-  $('image-status').textContent=processing.warning || ({removed:'상품 배경을 제거하고 부드러운 그림자를 더했어요.',transparent:'투명한 상품 이미지에 부드러운 그림자를 더했어요.',kept:'원본 사진의 배경을 유지했어요.'}[processing.background] || '');
+  $('image-status').textContent=processing.source==='original'?'공간과 분위기가 살아나도록 원본 사진의 배경을 사용했어요.':(processing.warning || ({removed:'상품 배경을 제거해 구도에 맞춰 배치했어요.',transparent:'투명한 상품 이미지를 구도에 맞춰 배치했어요.',kept:'원본 사진의 배경을 유지했어요.'}[processing.background] || ''));
   $('image-status').hidden=!$('image-status').textContent;
   $('selected-label').textContent='선택한 시안 '+(selected+1)+' · 버전 '+draft.version;
   $('download').href=draft.image_url+'?download=true';
   $('caption').textContent=[draft.caption.headline,draft.caption.body,draft.caption.hashtags.join(' ')].filter(Boolean).join('\n\n');
+  $('layout-note').textContent=config.templates.find(t=>t.id===draft.design.template_id).description;
+  renderTemplates();
+}
+function renderTemplates(){
+  const draft=drafts[selected];
   $('templates').replaceChildren();
-  for(const [id,name] of Object.entries(templateNames)){
+  document.querySelectorAll('[data-template-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.templateFilter===templateFilter)));
+  for(const template of config.templates.filter(t=>templateFilter==='all'||t.new)){
+    const {id,name}=template;
     const button=document.createElement('button');button.type='button';button.className='template';button.setAttribute('aria-pressed',String(draft.design.template_id===id));
-    const art=document.createElement('i');art.dataset.layout=id;art.style.setProperty('--swatch',swatches[id]);button.append(art,document.createTextNode(name));
+    const art=document.createElement('i');art.dataset.layout=id;art.style.setProperty('--swatch',swatches[id]);button.append(art,document.createTextNode(name));button.title=template.description;
     button.onclick=()=>revise(id+' 템플릿으로 바꿔줘');$('templates').append(button);
   }
 }
+document.querySelectorAll('[data-template-filter]').forEach(button=>button.onclick=()=>{if(!busy){templateFilter=button.dataset.templateFilter;renderTemplates();}});
 async function revise(instruction){
   if(busy||!drafts.length||!instruction.trim())return;
   const current=drafts[selected];lock(true);message('선택한 시안을 다듬고 있어요.');

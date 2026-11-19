@@ -73,9 +73,11 @@ class Engine:
             for design in designs:
                 self.check(deadline, cancelled)
                 design = validate_copy(design, brief)
-                png = self.renderer.render(brief, design, processed.data, logo)
+                scene = design.template_id == "photo_mood"
+                png = self.renderer.render(brief, design, photo if scene else processed.data, logo)
                 record = self.record(brief, design)
-                record["image_processing"] = {"background": processed.status, "warning": processed.warning}
+                record["image_processing"] = {"background": processed.status, "warning": processed.warning,
+                                              "source": "original" if scene else "processed"}
                 prepared.append((record, png))
             self.check(deadline, cancelled)
             records = self.repository.create(brief, photo, logo, style, prepared,
@@ -108,9 +110,12 @@ class Engine:
                                           instruction=revision.instruction)[0]
             design = validate_copy(design, brief)
             self.check(deadline, cancelled)
+            if design.template_id == "photo_mood":
+                photo = self.repository.get(draft_id, revision.store_id, original=True)[2]
             png = self.renderer.render(brief, design, photo, logo)
             self.check(deadline, cancelled)
             record = self.record(brief, design, draft_id=draft_id, version=old["version"]+1)
             record["project_id"] = old["project_id"]
-            record["image_processing"] = old.get("image_processing", {"background": "kept", "warning": ""})
+            record["image_processing"] = old.get("image_processing", {"background": "kept", "warning": ""}) | {
+                "source": "original" if design.template_id == "photo_mood" else "processed"}
             return self.expose(self.repository.revise(record, png, revision.expected_version))

@@ -121,7 +121,7 @@ class Renderer:
             mask=ImageChops.subtract(mask.filter(ImageFilter.MaxFilter(7)),mask)
         canvas.paste(color,(x,y,x+w,y+h),mask)
 
-    def photo(self, canvas, data, box, panel, ink, product, fit="contain", radius=10, angle=0, rotate_tall=False):
+    def photo(self, canvas, data, box, panel, ink, product, fit="contain", radius=10, angle=0, rotate_tall=False, shadow_style="soft"):
         x, y, w, h = map(int, box)
         if min(w, h) < 100:
             raise LayoutError("상품 사진을 배치할 공간이 부족합니다. 글귀를 줄여 주세요.")
@@ -135,13 +135,22 @@ class Renderer:
                 if angle and (rotate_tall or source.width/source.height > 1.3):
                     source = source.rotate(angle, Image.Resampling.BICUBIC, expand=True)
                 # Transparent assets float on the layout, with breathing room for a soft shadow.
-                scale = min(w*.88/source.width, h*.86/source.height)
+                inset_w, inset_h = (.73, .70) if shadow_style == "long" else (.88, .86)
+                scale = min(w*inset_w/source.width, h*inset_h/source.height)
                 source = source.resize((max(1, round(source.width*scale)), max(1, round(source.height*scale))), Image.Resampling.LANCZOS)
                 layer = Image.new("RGBA", (w, h))
                 px, py = (w-source.width)//2, (h-source.height)//2
                 shadow_mask = Image.new("L", (w, h))
-                shadow_mask.paste(source.getchannel("A"), (px+7, py+17))
-                shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(18)).point(lambda v: round(v*.23))
+                if shadow_style == "long":
+                    dx,dy=min(160,px-8),min(190,py-8)
+                    for step in range(32):
+                        shifted=Image.new("L",(w,h))
+                        shifted.paste(source.getchannel("A"),(px+round(dx*step/31),py+round(dy*step/31)))
+                        shadow_mask=ImageChops.lighter(shadow_mask,shifted)
+                    shadow_mask=shadow_mask.filter(ImageFilter.GaussianBlur(2)).point(lambda v: round(v*.30))
+                else:
+                    shadow_mask.paste(source.getchannel("A"), (px+7, py+17))
+                    shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(18)).point(lambda v: round(v*.23))
                 shadow = Image.new("RGBA", (w, h), (24, 20, 17, 0))
                 shadow.putalpha(shadow_mask)
                 layer.alpha_composite(shadow)
@@ -193,6 +202,9 @@ class Renderer:
             return self._render_compact(brief, design, product_image, logo)
 
     def _render_design(self, brief, design, product_image=None, logo=None):
+        from .creative_layouts import CREATIVE_IDS, render_creative
+        if design.template_id in CREATIVE_IDS:
+            return render_creative(self, brief, design, product_image, logo)
         bg, fg, accent, panel, muted = PALETTES[design.palette]
         canvas = Image.new("RGB", (WIDTH, HEIGHT), bg)
         d = ImageDraw.Draw(canvas)

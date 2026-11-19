@@ -32,7 +32,7 @@
 <section class="results" aria-label="포스터 제작 결과">
 <div class="section-head"><div><p class="eyebrow">MADE FOR YOUR STORE</p><h2>어떤 한 장이 마음에 드세요?</h2></div><span id="count" class="count">시안 3개</span></div>
 <div id="status" class="status" role="status" aria-live="polite"></div><div id="error" class="error" role="alert" hidden></div>
-<div id="empty" class="empty-state"><div class="paper-stack"><div class="paper p1"><span>작은 가게의<br>큰 매력</span><i></i></div><div class="paper p2"><small>OUR SIGNATURE</small><span>좋은 하루,<br>좋은 한입.</span><i></i></div><div class="paper p3"><span>오늘을<br>더 특별하게</span><i></i></div></div><h3>가게만의 분위기를 찾아보세요</h3><p>상품 정보로 서로 다른 세 가지 시안을 만들어요.<br>마음에 드는 한 장을 골라 더 다듬어 보세요.</p><div class="tags"><span>12가지 템플릿</span><span>자연어 수정</span><span>PNG 저장</span></div></div>
+<div id="empty" class="empty-state"><div class="paper-stack"><div class="paper p1"><span>작은 가게의<br>큰 매력</span><i></i></div><div class="paper p2"><small>OUR SIGNATURE</small><span>좋은 하루,<br>좋은 한입.</span><i></i></div><div class="paper p3"><span>오늘을<br>더 특별하게</span><i></i></div></div><h3>가게만의 분위기를 찾아보세요</h3><p>상품 정보로 서로 다른 세 가지 시안을 만들어요.<br>마음에 드는 한 장을 골라 더 다듬어 보세요.</p><div class="tags"><span id="template-count">18가지 템플릿</span><span>자연어 수정</span><span>PNG 저장</span></div></div>
 <div id="drafts" class="draft-grid" hidden></div>
 <p id="image-status" class="note" role="status" hidden></p>
 <section id="editor" class="editor panel" hidden>
@@ -40,7 +40,7 @@
 <label for="instruction">어떻게 바꾸고 싶으세요?</label><div class="edit-row"><input id="instruction" maxlength="500" placeholder="예: 배경은 초록색으로, 가격을 더 강조해줘"><button id="revise" class="primary" type="button">수정하기</button></div>
 <div class="suggestions"><button type="button" data-edit="배경을 초록색으로 바꿔줘">초록색으로</button><button type="button" data-edit="가격을 더 강조해줘">가격 강조</button><button type="button" data-edit="제목을 고운돋움으로 바꿔줘">부드러운 글씨</button><button type="button" data-edit="사진 전체가 보이게 해줘">사진 전체 보기</button></div>
 <details class="font-picker"><summary>글꼴 바꾸기 <small>선택</small></summary><label for="font-select">제목 글꼴</label><div class="edit-row"><select id="font-select"></select><button id="font-apply" class="primary" type="button">글꼴 적용</button></div><p id="font-description" class="note"></p><img id="font-preview" alt="선택한 제목 글꼴 미리보기" width="800" height="130"><p class="note">상업용 포스터에 사용할 수 있는 무료 글꼴입니다.</p></details>
-<details><summary>다른 분위기 둘러보기 <small>선택</small></summary><div id="templates" class="template-grid"></div></details>
+<details><summary>다른 분위기 둘러보기 <small>선택</small></summary><div class="template-filters" role="group" aria-label="구도 종류"><button type="button" data-template-filter="new" aria-pressed="true">새로운 구도</button><button type="button" data-template-filter="all" aria-pressed="false">전체 구도</button></div><p id="layout-note" class="note"></p><div id="templates" class="template-grid"></div></details>
 <div class="caption"><div class="section-head"><h3>함께 올릴 홍보 문구</h3><button id="copy-caption" class="text-button" type="button">복사</button></div><pre id="caption"></pre></div>
 <p class="note">가격·상품·기간을 바꾸려면 왼쪽 정보를 수정하고 새 시안을 만들어 주세요. 게시 전 문구와 행사 정보를 확인해 주세요.</p>
 </section>

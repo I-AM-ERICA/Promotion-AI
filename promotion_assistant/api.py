@@ -9,7 +9,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from .clova import ProviderError
 from .models import Brief, Revision
 from .storage import NotFound, Conflict
-from .templates import TEMPLATES, default_font
+from .templates import TEMPLATES, PALETTES, default_font
+from .creative_layouts import CREATIVE_IDS
 from .font_catalog import public_fonts, FONT_BY_ID
 
 STATIC = Path(__file__).parent / "static"
@@ -134,7 +135,9 @@ def create_app(engine):
     def studio(request: Request):
         if not engine.settings.studio or not local(request):
             raise HTTPException(404)
-        config = json.dumps({"token": studio_token, "mode": "demo" if engine.settings.demo else "clova", "fonts": public_fonts(), "templateFonts": {t.id: default_font(t.id) for t in TEMPLATES}})
+        config = json.dumps({"token": studio_token, "mode": "demo" if engine.settings.demo else "clova", "fonts": public_fonts(),
+                             "templateFonts": {t.id: default_font(t.id) for t in TEMPLATES},
+                             "templates": [t.__dict__ | {"preview_color": PALETTES[t.palette][0], "new": t.id in CREATIVE_IDS} for t in TEMPLATES]})
         html = (STATIC / "index.html").read_text(encoding="utf-8").replace("__CONFIG__", config)
         return HTMLResponse(html, headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY",
                                           "Referrer-Policy": "no-referrer"})

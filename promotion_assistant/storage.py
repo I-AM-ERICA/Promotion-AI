@@ -72,14 +72,14 @@ class Repository:
                 (self.images / name).unlink(missing_ok=True)
             raise
 
-    def get(self, draft_id, store_id):
+    def get(self, draft_id, store_id, *, original=False):
         with self.connect() as db:
-            row = db.execute("""SELECT d.record,p.brief,COALESCE(p.cutout,p.photo) AS photo,p.logo,p.style FROM drafts d
+            row = db.execute("""SELECT d.record,p.brief,COALESCE(p.cutout,p.photo) AS photo,p.photo AS original_photo,p.logo,p.style FROM drafts d
                 JOIN projects p ON d.project_id=p.id WHERE d.id=? AND p.store_id=?
                 ORDER BY d.version DESC LIMIT 1""", (draft_id, store_id)).fetchone()
         if not row:
             raise NotFound("시안을 찾을 수 없습니다.")
-        return json.loads(row["record"]), json.loads(row["brief"]), row["photo"], row["logo"], row["style"]
+        return json.loads(row["record"]), json.loads(row["brief"]), row["original_photo" if original else "photo"], row["logo"], row["style"]
 
     def revise(self, record, png, expected):
         name = None

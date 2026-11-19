@@ -26,6 +26,12 @@ TEMPLATES = [
     Template("diagonal", "다이내믹", "두 가지 색면과 대각선 상품, 신발·잡화·전자제품", "cobalt", "offer", "dohyeon"),
     Template("floating_type", "플로팅 타입", "큰 글자와 윤곽선 글자 사이에 떠 있는 상품", "sky", "offer", "black_han_sans"),
     Template("big_focus", "빅 포커스", "대담한 큰 글자와 화면을 채우는 상품", "tangerine", "brand", "black_han_sans"),
+    Template("orbit_script", "오비트 레터", "왼쪽으로 기울인 상품과 원형 글자·손글씨", "cream", "hero", "black_han_sans"),
+    Template("service_board", "서비스 보드", "왼쪽 가격·정보와 오른쪽 아래 큰 사진", "sky", "offer", "dohyeon"),
+    Template("photo_mood", "포토 무드", "원본 공간 사진 위의 큰 제목과 손글씨", "forest", "brand", "bold"),
+    Template("cast_shadow", "선셋 섀도", "왼쪽 상품과 긴 그림자, 오른쪽의 짧은 문구", "coral", "offer", "black_han_sans"),
+    Template("wave_split", "웨이브 스플릿", "물결 색면 위 오른쪽 상품과 왼쪽 손글씨", "scarlet", "brand", "black_han_sans"),
+    Template("edge_closeup", "엣지 클로즈업", "상품을 크게 확대해 오른쪽 가장자리 밖까지 배치", "burgundy", "hero", "black_han_sans"),
 ]
 
 
@@ -42,11 +48,17 @@ REFERENCE_LAYOUTS = {
     "studio": ("spotlight", "split", "night"),
     "dynamic": ("type_stack", "diagonal", "big_focus"),
     "minimal": ("editorial", "bold_sale", "soft_frame"),
+    "playful": ("orbit_script", "floating_type", "wave_split"),
+    "service": ("edge_closeup", "service_board", "photo_mood"),
+    "photographic": ("edge_closeup", "service_board", "photo_mood"),
+    "shadow": ("type_stack", "cast_shadow", "big_focus"),
+    "wave": ("orbit_script", "service_board", "wave_split"),
+    "closeup": ("edge_closeup", "cast_shadow", "magazine"),
 }
 
 
 def reference_family(style):
-    match = re.match(r"\s*\[(typography|editorial|studio|dynamic|minimal)\]", style, re.I)
+    match = re.match(r"\s*\[("+"|".join(REFERENCE_LAYOUTS)+r")\]", style, re.I)
     return match[1].lower() if match else None
 
 

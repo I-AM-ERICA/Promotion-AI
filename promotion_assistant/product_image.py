@@ -19,7 +19,9 @@ def png(image):
 
 
 def has_transparency(image):
-    return image.getchannel("A").getextrema()[0] < 250
+    # A thin transparent export border does not make a scene photo a cutout.
+    histogram = image.getchannel("A").histogram()
+    return sum(histogram[:250]) >= image.width*image.height*.02
 
 
 class ProductProcessor:

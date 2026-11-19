@@ -48,6 +48,14 @@ def test_bad_mask_fallback_is_visible():
         processor.process(source,"remove")
 
 
+def test_tiny_transparent_border_still_runs_segmentation():
+    image=Image.new("RGBA",(200,200),(25,150,50,255))
+    ImageDraw.Draw(image).line((0,0,0,199),fill=(0,0,0,0),width=1)
+    session=Segmenter()
+    result=ProductProcessor(session).process(png(image),"remove")
+    assert result.status=="removed" and session.calls==1
+
+
 def test_existing_database_migrates_without_losing_original(tmp_path):
     root=tmp_path
     db=sqlite3.connect(root/"posters.sqlite3")

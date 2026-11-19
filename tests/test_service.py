@@ -164,7 +164,12 @@ def test_api_auth_studio_csrf_and_png_download(engine,brief):
     with TestClient(create_app(engine)) as client:
         assert client.post("/v1/posters/drafts",json=brief.model_dump()).status_code==401
         page=client.get("/")
-        token=json.loads(re.search(r'<script id="studio-config" type="application/json">(.*?)</script>',page.text).group(1))["token"]
+        config=json.loads(re.search(r'<script id="studio-config" type="application/json">(.*?)</script>',page.text).group(1))
+        token=config["token"]
+        from promotion_assistant.templates import TEMPLATES
+        from promotion_assistant.creative_layouts import CREATIVE_IDS
+        assert {t["id"] for t in config["templates"]} == {t.id for t in TEMPLATES}
+        assert {t["id"] for t in config["templates"] if t["new"]} == CREATIVE_IDS
         assert "test-key" not in page.text
         bad=client.post("/v1/posters/drafts",headers={"X-Studio-Token":token,"Origin":"https://evil.example"},json=brief.model_dump())
         assert bad.status_code==401
